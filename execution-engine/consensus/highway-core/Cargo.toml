@@ -1,0 +1,11 @@
+[package]
+name = "highway-core"
+version = "0.1.0"
+authors = ["Andreas Fackler <andreas@casperlabs.io>"]
+edition = "2018"
+description = "The permissioned Highway Core consensus algorithm."
+homepage = "https://casperlabs.io"
+repository = "https://github.com/CasperLabs/CasperLabs"
+license-file = "../LICENSE"
+
+[dependencies]
