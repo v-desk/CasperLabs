@@ -8,6 +8,8 @@ cargo-features = [
 members = [
     "cargo-casperlabs",
     "consensus/highway-core",
+    "consensus/consensus-protocol",
+    "consensus/consensus-service",
     "contract",
     "contracts/[!.]*/*",
     "engine-core",

@@ -1,0 +1,13 @@
+[package]
+name = "consensus-service"
+version = "0.1.0"
+authors = ["Mateusz Górski <mateusz@casperlabs.io>"]
+edition = "2018"
+description = "An API for consensus component exposed to the clients."
+homepage = "https://casperlabs.io"
+repository = "https://github.com/CasperLabs/CasperLabs"
+license-file = "../LICENSE"
+
+[dependencies]
+anyhow = "1.0.28"
+consensus-protocol = { path="../consensus-protocol", version = "0.1.0", package = "consensus-protocol"}

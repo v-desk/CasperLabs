@@ -1,0 +1,14 @@
+[package]
+name = "consensus-protocol"
+version = "0.1.0"
+authors = ["Mateusz Górski <gorski.mateusz@protonmail.ch>"]
+edition = "2018"
+description = "An API for consensus protocol."
+homepage = "https://casperlabs.io"
+repository = "https://github.com/CasperLabs/CasperLabs"
+license-file = "../LICENSE"
+
+
+[dependencies]
+anyhow = "1.0.28"
+highway = { path="../highway-core", version = "0.1.0", package = "highway-core"}
