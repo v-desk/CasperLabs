@@ -4,16 +4,24 @@ pub use chain::BlockIndex;
 use chain::Chain;
 use std::time::{Duration, Instant};
 
+/// A trait for block types to implement
 pub trait Block: Clone {}
+impl<T> Block for T where T: Clone {}
 
+/// An identifier for a timer set to fire at a later moment
 pub type TimerId = u64;
 
+/// Possible effects that could result from the consensus operations
 pub enum Effect<B> {
+    /// A request for a timer to be scheduled
     ScheduleTimer(TimerId, Instant),
+    /// A request for a block to be proposed
     RequestBlock,
+    /// A notification that a block has been finalized
     FinalizedBlock(BlockIndex, B),
 }
 
+/// The state of the consensus protocol
 pub struct Pothole<B: Block> {
     dictator: bool,
     chain: Chain<B>,
@@ -23,6 +31,9 @@ pub struct Pothole<B: Block> {
 const BLOCK_PROPOSE_DURATION: Duration = Duration::from_millis(10_000);
 
 impl<B: Block> Pothole<B> {
+    /// Creates a new instance of the protocol. The parameter defines whether this instance is the
+    /// dictator (the node determining the order of blocks). Returns the protocol instance along
+    /// with some possible side-effects.
     pub fn new(dictator: bool) -> (Self, Vec<Effect<B>>) {
         (
             Self {
@@ -41,6 +52,7 @@ impl<B: Block> Pothole<B> {
         )
     }
 
+    /// Handles a timer event (scheduled according to an earlier ScheduleTimer request).
     pub fn handle_timer(&mut self, timer: TimerId) -> Vec<Effect<B>> {
         if Some(timer) == self.block_timer {
             vec![
@@ -52,6 +64,7 @@ impl<B: Block> Pothole<B> {
         }
     }
 
+    /// Proposes a new block for the chain.
     pub fn propose_block(&mut self, block: B) -> Vec<Effect<B>> {
         if self.dictator {
             let index = self.chain.append(block.clone());
@@ -61,6 +74,7 @@ impl<B: Block> Pothole<B> {
         }
     }
 
+    /// Handles a notification about a new block having been finalized.
     pub fn handle_new_block(&mut self, index: BlockIndex, block: B) -> Vec<Effect<B>> {
         if self.dictator {
             Vec::new()
@@ -73,18 +87,22 @@ impl<B: Block> Pothole<B> {
         }
     }
 
+    /// Returns the number of blocks in the chain.
     pub fn num_blocks(&self) -> usize {
         self.chain.num_blocks()
     }
 
+    /// Returns the reference to the last block in the chain.
     pub fn get_last_block(&self) -> Option<&B> {
         self.chain.get_last_block()
     }
 
+    /// Gets the block at a given index.
     pub fn get_block(&self, index: BlockIndex) -> Option<&B> {
         self.chain.get_block(index)
     }
 
+    /// Returns an iterator over blocks in the chain.
     pub fn blocks_iterator(&self) -> impl Iterator<Item = (&BlockIndex, &B)> {
         self.chain.blocks_iterator()
     }

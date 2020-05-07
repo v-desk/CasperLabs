@@ -6,6 +6,8 @@ use mock_network::NodeSet;
 
 const NODE_NAMES: [&'static str; 6] = ["Alice", "Bob", "Carol", "Dave", "Eric", "Fred"];
 
+// This test initializes a few nodes, proposes a few transactions and checks whether all nodes have
+// the same chain of finalized blocks in the end.
 #[test]
 fn test_consensus() {
     let mut nodes = NodeSet::new(&NODE_NAMES[..]);

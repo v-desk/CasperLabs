@@ -1,22 +1,22 @@
-use std::collections::BTreeSet;
-use std::mem;
+use std::{collections::BTreeSet, mem};
 
-use pothole::Block as BlockTrait;
-use pothole::{BlockIndex, Effect, Pothole};
+use pothole::{Block as BlockTrait, BlockIndex, Effect, Pothole};
 
 use super::{NetworkMessage, WorldHandle};
 
+/// A dummy transaction type
 pub type Transaction = String;
 
+/// A dummy block type, containing dummy transactions
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block {
     transactions: Vec<Transaction>,
 }
 
-impl BlockTrait for Block {}
-
+/// A dummy NodeId - a static string
 pub type NodeId = &'static str;
 
+/// A mock Node type: representing a node in the network running a Pothole instance
 pub struct Node {
     #[allow(unused)]
     our_id: NodeId,
@@ -27,6 +27,8 @@ pub struct Node {
 }
 
 impl Node {
+    /// Creates a new Node with a given ID and set of peers. If this node is the first
+    /// (lexicographically) among the peers, it becomes the dictator.
     pub fn new(our_id: NodeId, mut all_ids: BTreeSet<NodeId>, world: WorldHandle) -> Self {
         let dictator = Some(&our_id) == all_ids.iter().next();
         let _ = all_ids.remove(&our_id);
@@ -42,6 +44,8 @@ impl Node {
         node
     }
 
+    /// Handles a single effect returned from the Pothole instance. Returns all the effects created
+    /// as a result.
     fn handle_pothole_effect(&mut self, effect: Effect<Block>) -> Vec<Effect<Block>> {
         match effect {
             Effect::ScheduleTimer(timer_id, instant) => {
@@ -74,6 +78,7 @@ impl Node {
         }
     }
 
+    /// Handles a set of effects returned from the Pothole instance.
     fn handle_effects(&mut self, mut effects: Vec<Effect<Block>>) {
         loop {
             effects = effects
@@ -86,6 +91,7 @@ impl Node {
         }
     }
 
+    /// Handles an incoming network message.
     fn handle_message(&mut self, _sender: NodeId, message: NetworkMessage) -> Vec<Effect<Block>> {
         match message {
             NetworkMessage::NewTransaction(transaction) => {
@@ -98,6 +104,7 @@ impl Node {
         }
     }
 
+    /// Proposes a new transaction to be included in a future block.
     pub fn propose_transaction(&mut self, transaction: Transaction) {
         self.transaction_buffer.insert(transaction.clone());
         for node in &self.other_nodes {
@@ -106,7 +113,8 @@ impl Node {
         }
     }
 
-    /// Returns whether any actions were taken this step
+    /// Takes a simulated step - processes all the events that happened since the last step (which
+    /// can include timer events and incoming network messages).
     pub fn step(&mut self) {
         let timers = self.world.fire_timers();
         let mut effects: Vec<_> = timers
@@ -121,10 +129,13 @@ impl Node {
         self.handle_effects(effects);
     }
 
+    /// Returns an iterator over the blocks that reached consensus.
     pub fn consensused_blocks(&self) -> impl Iterator<Item = (&BlockIndex, &Block)> {
         self.pothole.blocks_iterator()
     }
 
+    /// Returns whether this node still has some transactions that have been proposed, but not
+    /// included in a finalized block.
     pub fn has_pending_transactions(&self) -> bool {
         !self.transaction_buffer.is_empty()
     }
