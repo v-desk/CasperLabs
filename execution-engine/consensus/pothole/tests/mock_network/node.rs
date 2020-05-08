@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, mem};
 
-use pothole::{Block as BlockTrait, BlockIndex, Effect, Pothole};
+use pothole::{BlockIndex, Effect, Pothole};
 
 use super::{NetworkMessage, WorldHandle};
 
@@ -30,13 +30,12 @@ impl Node {
     /// Creates a new Node with a given ID and set of peers. If this node is the first
     /// (lexicographically) among the peers, it becomes the dictator.
     pub fn new(our_id: NodeId, mut all_ids: BTreeSet<NodeId>, world: WorldHandle) -> Self {
-        let dictator = Some(&our_id) == all_ids.iter().next();
+        let (pothole, effects) = Pothole::new(&our_id, &all_ids);
         let _ = all_ids.remove(&our_id);
-        let (pothole, effects) = Pothole::new(dictator);
         let mut node = Self {
             our_id,
             other_nodes: all_ids,
-            pothole: pothole,
+            pothole,
             world,
             transaction_buffer: Default::default(),
         };

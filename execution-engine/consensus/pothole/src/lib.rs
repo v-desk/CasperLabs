@@ -2,11 +2,18 @@ mod chain;
 
 pub use chain::BlockIndex;
 use chain::Chain;
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeSet,
+    fmt::Debug,
+    time::{Duration, Instant},
+};
 
 /// A trait for block types to implement
-pub trait Block: Clone {}
-impl<T> Block for T where T: Clone {}
+pub trait Block: Clone + Debug {}
+impl<T> Block for T where T: Clone + Debug {}
+
+pub trait NodeId: Clone + Debug + PartialEq + Ord {}
+impl<T> NodeId for T where T: Clone + Debug + PartialEq + Ord {}
 
 /// An identifier for a timer set to fire at a later moment
 pub type TimerId = u64;
@@ -34,7 +41,8 @@ impl<B: Block> Pothole<B> {
     /// Creates a new instance of the protocol. The parameter defines whether this instance is the
     /// dictator (the node determining the order of blocks). Returns the protocol instance along
     /// with some possible side-effects.
-    pub fn new(dictator: bool) -> (Self, Vec<Effect<B>>) {
+    pub fn new<N: NodeId>(our_id: &N, all_nodes: &BTreeSet<N>) -> (Self, Vec<Effect<B>>) {
+        let dictator = Some(our_id) == all_nodes.iter().next();
         (
             Self {
                 dictator,

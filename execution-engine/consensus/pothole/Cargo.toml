@@ -1,8 +1,9 @@
 [package]
 name = "pothole"
 version = "0.1.0"
-authors = ["Bartłomiej Kamiński <fizyk20@gmail.com>"]
+authors = ["Bartłomiej Kamiński <bart@casperlabs.io>"]
 edition = "2018"
+description = "A simple, fault-intolerant consensus algorithm to be used as a placeholder for Highway"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

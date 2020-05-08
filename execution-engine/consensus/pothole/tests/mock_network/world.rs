@@ -38,7 +38,7 @@ impl World {
     pub fn send_message(&mut self, sender: NodeId, recipient: NodeId, message: NetworkMessage) {
         self.message_queue
             .entry(recipient)
-            .or_insert_with(Default::default)
+            .or_default()
             .push_back(MsgQueueEntry { sender, message });
     }
 
@@ -57,10 +57,7 @@ impl World {
     /// Schedules a timer with ID `timer` to fire on `instant` or later. Node with ID `node` will
     /// be notified about the event.
     pub fn schedule_timer(&mut self, node: NodeId, timer: TimerId, instant: Instant) {
-        self.timers
-            .entry(node)
-            .or_insert_with(Default::default)
-            .insert(instant, timer);
+        self.timers.entry(node).or_default().insert(instant, timer);
     }
 
     /// Return all the timers for `node` that should currently fire.
