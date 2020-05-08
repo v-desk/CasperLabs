@@ -86,12 +86,10 @@ impl<B: Block> Pothole<B> {
     pub fn handle_new_block(&mut self, index: BlockIndex, block: B) -> Vec<Effect<B>> {
         if self.dictator {
             Vec::new()
+        } else if self.chain.insert(index, block.clone()).is_none() {
+            vec![Effect::FinalizedBlock(index, block)]
         } else {
-            if self.chain.insert(index, block.clone()).is_none() {
-                vec![Effect::FinalizedBlock(index, block)]
-            } else {
-                vec![]
-            }
+            vec![]
         }
     }
 
