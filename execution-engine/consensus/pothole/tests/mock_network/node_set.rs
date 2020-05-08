@@ -16,18 +16,18 @@ pub struct NodeSet {
 impl NodeSet {
     /// Creates a new set of nodes with the given IDs.
     pub fn new(nodes: &[NodeId]) -> Self {
-        let ids: BTreeSet<_> = nodes.into_iter().cloned().collect();
+        let ids: BTreeSet<_> = nodes.iter().cloned().collect();
         let world = Rc::new(RefCell::new(World::new()));
         Self {
             nodes: nodes
-                .into_iter()
+                .iter()
                 .map(|id| {
                     (
-                        id.clone(),
+                        NodeId::clone(id),
                         Node::new(
-                            id.clone(),
+                            NodeId::clone(id),
                             ids.clone(),
-                            WorldHandle::new(world.clone(), id.clone()),
+                            WorldHandle::new(world.clone(), NodeId::clone(id)),
                         ),
                     )
                 })
@@ -57,7 +57,7 @@ impl NodeSet {
                 .advance_time(Duration::from_millis(250));
         }
 
-        for (_, node) in &mut self.nodes {
+        for node in self.nodes.values_mut() {
             node.step();
         }
     }

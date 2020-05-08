@@ -51,7 +51,7 @@ impl Node {
                 vec![]
             }
             Effect::RequestBlock => {
-                let transactions = mem::replace(&mut self.transaction_buffer, Default::default());
+                let transactions = mem::take(&mut self.transaction_buffer);
                 if !transactions.is_empty() {
                     self.pothole.propose_block(Block {
                         transactions: transactions.into_iter().collect::<Vec<_>>(),
