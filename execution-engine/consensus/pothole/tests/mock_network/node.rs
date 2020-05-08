@@ -27,8 +27,7 @@ pub struct Node {
 }
 
 impl Node {
-    /// Creates a new Node with a given ID and set of peers. If this node is the first
-    /// (lexicographically) among the peers, it becomes the dictator.
+    /// Creates a new Node with a given ID and set of peers.
     pub fn new(our_id: NodeId, mut all_ids: BTreeSet<NodeId>, world: WorldHandle) -> Self {
         let (pothole, effects) = Pothole::new(&our_id, &all_ids);
         let _ = all_ids.remove(&our_id);

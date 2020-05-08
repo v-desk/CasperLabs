@@ -38,9 +38,9 @@ pub struct Pothole<B: Block> {
 const BLOCK_PROPOSE_DURATION: Duration = Duration::from_millis(10_000);
 
 impl<B: Block> Pothole<B> {
-    /// Creates a new instance of the protocol. The parameter defines whether this instance is the
-    /// dictator (the node determining the order of blocks). Returns the protocol instance along
-    /// with some possible side-effects.
+    /// Creates a new instance of the protocol. If this node is the first (lexicographically) among
+    /// the peers, it becomes the dictator (the node determining the order of blocks). Returns the
+    /// protocol instance along with some possible side-effects.
     pub fn new<N: NodeId>(our_id: &N, all_nodes: &BTreeSet<N>) -> (Self, Vec<Effect<B>>) {
         let dictator = Some(our_id) == all_nodes.iter().next();
         (
