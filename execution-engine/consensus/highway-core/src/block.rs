@@ -8,5 +8,5 @@ pub struct Block<C: Context> {
     /// The total number of ancestors, i.e. the height in the blockchain.
     pub height: u64,
     /// The payload, e.g. a list of transactions.
-    pub value: C::ConsensusValue,
+    pub values: Vec<C::ConsensusValue>,
 }

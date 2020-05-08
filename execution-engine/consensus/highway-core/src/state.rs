@@ -75,12 +75,12 @@ impl<C: Context> State<C> {
 
     fn wire_vote(&self, hash: C::VoteHash) -> Option<WireVote<C>> {
         let vote = self.votes.get(&hash)?.clone();
-        let value = self.blocks.get(&hash).map(|block| block.value.clone());
+        let values = self.blocks.get(&hash).map(|block| block.values.clone());
         Some(WireVote {
             hash,
             panorama: vote.panorama.clone(),
             sender: self.params.validators.id_of(vote.sender_idx).clone(),
-            value,
+            values,
             seq_number: vote.seq_number,
         })
     }
@@ -106,14 +106,14 @@ impl<C: Context> State<C> {
         }
         let hash = wvote.hash.clone();
         let fork_choice: Option<C::VoteHash> = self.fork_choice(&wvote.panorama);
-        let block = if let Some(value) = wvote.value {
+        let block = if let Some(values) = wvote.values {
             let height = fork_choice
                 .as_ref()
                 .map_or(0, |hash| self.blocks[hash].height + 1);
             let block = Block {
                 parent: fork_choice,
                 height,
-                value,
+                values,
             };
             self.blocks.insert(hash.clone(), block);
             hash.clone()

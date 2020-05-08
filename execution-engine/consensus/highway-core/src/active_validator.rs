@@ -26,8 +26,8 @@ impl<C: Context> ActiveValidator<C> {
     }
 
     /// Propose a new block with the given parent and consensus value.
-    pub fn propose(&self, state: &State<C>, value: C::ConsensusValue) -> Vec<Effect<C>> {
-        todo!("{:?}, {:?}", state, value)
+    pub fn propose(&self, state: &State<C>, values: Vec<C::ConsensusValue>) -> Vec<Effect<C>> {
+        todo!("{:?}, {:?}", state, values)
         // vec![Effect::NewVertex(Vertex::Vote(vote))]
     }
 }
