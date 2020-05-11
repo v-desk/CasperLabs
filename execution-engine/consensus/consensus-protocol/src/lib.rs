@@ -1,7 +1,7 @@
-use std::hash::Hash;
+use std::{hash::Hash, time::Instant};
 
-mod synchronizer;
 mod protocol_state;
+mod synchronizer;
 
 pub trait ConsensusContext {
     // Consensus specific message.
@@ -30,8 +30,8 @@ pub trait ConsensusContext {
 
 #[derive(Debug)]
 pub enum ConsensusProtocolResult<Ctx: ConsensusContext> {
-    NewMessage(Ctx::OutgoingMessage),
-    InvalidMessage(Ctx::IncomingMessage, anyhow::Error),
+    CreatedNewMessage(Ctx::OutgoingMessage),
+    InvalidIncomingMessage(Ctx::IncomingMessage, anyhow::Error),
 }
 
 /// An API for a single instance of the consensus.

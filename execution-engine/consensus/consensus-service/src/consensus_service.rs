@@ -72,7 +72,15 @@ where
                     let message: C::IncomingMessage = wire_msg
                         .try_into()
                         .map_err(|_| ConsensusServiceError::InvalidFormat("".to_string()))?;
-                    consensus.handle_message(message);
+                    consensus
+                        .handle_message(message)
+                        .map(|result| match result {
+                            ConsensusProtocolResult::InvalidIncomingMessage(msg, error) => {}
+                            ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
+                                let wire_msg: MessageWireFormat = out_msg.into();
+                                todo!("Create an effect to broadcast new msg")
+                            }
+                        });
                     Ok(Effect::Nothing)
                 }
             },

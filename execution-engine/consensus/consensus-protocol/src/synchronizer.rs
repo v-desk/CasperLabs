@@ -1,6 +1,8 @@
 use crate::protocol_state::{Vertex, VertexId};
-use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 // Note that we might be requesting download of the duplicate element
 // (one that had requested for earlier) but with a different node.
@@ -20,7 +22,8 @@ pub(crate) trait Synchronizer<NodeId, VId, V, C> {
     /// It may be a single deploy, list of deploys, an integer value etc.
     /// Implementations will know which values are missing
     /// (ex. deploys in the local deploy buffer vs new deploys introduced by the block).
-    /// Node passed in is the one that proposed the original vertex. It should also have the missing dependency.
+    /// Node passed in is the one that proposed the original vertex. It should also have the missing
+    /// dependency.
     fn sync_consensus_values(
         &mut self,
         node: NodeId,
@@ -29,8 +32,9 @@ pub(crate) trait Synchronizer<NodeId, VId, V, C> {
     ) -> SynchronizerEffect<NodeId, VId, V, C>;
 
     /// Synchronizes the dependency (single) of a newly received vertex.
-    /// In practice, this method will produce an effect that will be passed on to the reactor for handling.
-    /// Node passed in is the one that proposed the original vertex. It should also have the missing dependency.
+    /// In practice, this method will produce an effect that will be passed on to the reactor for
+    /// handling. Node passed in is the one that proposed the original vertex. It should also
+    /// have the missing dependency.
     fn sync_dependency(
         &mut self,
         node: NodeId,
@@ -185,8 +189,7 @@ where
     }
 }
 
-impl<NodeId, VId, V, C> Synchronizer<NodeId, VId, V, C>
-    for DagSynchronizerState<VId, V, C>
+impl<NodeId, VId, V, C> Synchronizer<NodeId, VId, V, C> for DagSynchronizerState<VId, V, C>
 where
     C: Clone + Hash + Eq + PartialEq,
     VId: VertexId + Clone + Hash + Eq + PartialEq,
