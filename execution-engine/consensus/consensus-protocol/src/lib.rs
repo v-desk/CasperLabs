@@ -16,7 +16,7 @@ pub trait ConsensusContext {
     //   CreateVote
     // }
     //
-    // Note that some consensus protocols (like honey badger) doesn't have dependencies,
+    // Note that some consensus protocols (like HoneyBadgerBFT) don't have dependencies,
     // so it's not possible to differentiate between new message and dependency requests
     // in consensus-agnostic layers.
     type IncomingMessage;
