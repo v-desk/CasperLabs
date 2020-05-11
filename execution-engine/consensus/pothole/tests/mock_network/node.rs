@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, mem};
 
-use pothole::{BlockIndex, Effect, Pothole};
+use pothole::{BlockIndex, Pothole, PotholeResult};
 
 use super::{NetworkMessage, WorldHandle};
 
@@ -17,6 +17,7 @@ pub struct Block {
 pub type NodeId = &'static str;
 
 /// A mock Node type: representing a node in the network running a Pothole instance
+#[derive(Debug)]
 pub struct Node {
     #[allow(unused)]
     our_id: NodeId,
@@ -44,13 +45,13 @@ impl Node {
 
     /// Handles a single effect returned from the Pothole instance. Returns all the effects created
     /// as a result.
-    fn handle_pothole_effect(&mut self, effect: Effect<Block>) -> Vec<Effect<Block>> {
+    fn handle_pothole_effect(&mut self, effect: PotholeResult<Block>) -> Vec<PotholeResult<Block>> {
         match effect {
-            Effect::ScheduleTimer(timer_id, instant) => {
+            PotholeResult::ScheduleTimer(timer_id, instant) => {
                 self.world.schedule_timer(timer_id, instant);
                 vec![]
             }
-            Effect::RequestBlock => {
+            PotholeResult::CreateNewBlock => {
                 let transactions = mem::take(&mut self.transaction_buffer);
                 if !transactions.is_empty() {
                     self.pothole.propose_block(Block {
@@ -60,7 +61,7 @@ impl Node {
                     vec![]
                 }
             }
-            Effect::FinalizedBlock(index, block) => {
+            PotholeResult::FinalizedBlock(index, block) => {
                 // remove finalized transactions from buffer
                 for transaction in &block.transactions {
                     self.transaction_buffer.remove(transaction);
@@ -77,7 +78,7 @@ impl Node {
     }
 
     /// Handles a set of effects returned from the Pothole instance.
-    fn handle_effects(&mut self, mut effects: Vec<Effect<Block>>) {
+    fn handle_effects(&mut self, mut effects: Vec<PotholeResult<Block>>) {
         loop {
             effects = effects
                 .into_iter()
@@ -90,7 +91,11 @@ impl Node {
     }
 
     /// Handles an incoming network message.
-    fn handle_message(&mut self, _sender: NodeId, message: NetworkMessage) -> Vec<Effect<Block>> {
+    fn handle_message(
+        &mut self,
+        _sender: NodeId,
+        message: NetworkMessage,
+    ) -> Vec<PotholeResult<Block>> {
         match message {
             NetworkMessage::NewTransaction(transaction) => {
                 self.transaction_buffer.insert(transaction);
@@ -129,7 +134,7 @@ impl Node {
 
     /// Returns an iterator over the blocks that reached consensus.
     pub fn consensused_blocks(&self) -> impl Iterator<Item = (&BlockIndex, &Block)> {
-        self.pothole.blocks_iterator()
+        self.pothole.chain().blocks_iterator()
     }
 
     /// Returns whether this node still has some transactions that have been proposed, but not

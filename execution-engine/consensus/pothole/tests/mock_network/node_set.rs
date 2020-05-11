@@ -8,6 +8,7 @@ use std::{
 use super::{Node, NodeId, Transaction, World, WorldHandle};
 
 /// A set of simulated nodes.
+#[derive(Debug)]
 pub struct NodeSet {
     world: Rc<RefCell<World>>,
     nodes: BTreeMap<NodeId, Node>,

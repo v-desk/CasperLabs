@@ -11,6 +11,7 @@ use pothole::TimerId;
 use super::{NetworkMessage, NodeId};
 
 /// A message in a recipient's queue
+#[derive(Debug)]
 pub struct MsgQueueEntry {
     pub sender: NodeId,
     pub message: NetworkMessage,
@@ -18,6 +19,7 @@ pub struct MsgQueueEntry {
 
 /// A structure representing the outside world that the node interacts with - in this case,
 /// providing network operations and timers.
+#[derive(Debug)]
 pub struct World {
     current_time: Instant,
     message_queue: HashMap<NodeId, VecDeque<MsgQueueEntry>>,
@@ -89,6 +91,7 @@ impl World {
 }
 
 /// A handle providing access to the World, to be kept by a Node.
+#[derive(Debug)]
 pub struct WorldHandle {
     world: Rc<RefCell<World>>,
     node_id: NodeId,

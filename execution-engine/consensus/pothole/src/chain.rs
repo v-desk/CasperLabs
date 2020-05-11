@@ -1,3 +1,5 @@
+//! This module provides a data structure for keeping the finalized blocks.
+
 use std::collections::BTreeMap;
 
 /// An identifier for the block position in the chain.
@@ -5,21 +7,21 @@ pub type BlockIndex = u64;
 
 /// A simple structure to contain a linear progression of blocks (allowing for sparse population,
 /// i.e. empty spaces left between blocks)
+#[derive(Debug, Default)]
 pub struct Chain<B> {
     blocks: BTreeMap<BlockIndex, B>,
     next_block: BlockIndex,
 }
 
-impl<B> Default for Chain<B> {
-    fn default() -> Self {
+impl<B> Chain<B> {
+    /// Creates a new, empty instance of Chain
+    pub fn new() -> Self {
         Self {
             blocks: Default::default(),
             next_block: 0,
         }
     }
-}
 
-impl<B> Chain<B> {
     /// Appends a new block right after the last one out of all currently held.
     pub fn append(&mut self, block: B) -> BlockIndex {
         self.blocks.insert(self.next_block, block);
