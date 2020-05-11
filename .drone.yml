@@ -478,87 +478,6 @@ steps:
   depends_on:
   - docker-build-key-bors
 
-# Release Branch Only
-- name: run-integration-tests-parallel-0
-  commands:
-  - "cd integration-testing"
-  - "./docker_run_tests.sh --unique_run_num 0"
-  environment:
-    _JAVA_OPTIONS: "-Xms2G -Xmx2G -XX:MaxMetaspaceSize=1G"
-  image: "casperlabs/buildenv:latest"
-  volumes:
-  - name: docker_sock
-    path: "/var/run/docker.sock"
-  - name: temp
-    path: "/tmp"
-  when:
-    branch:
-    - release-*
-  depends_on:
-  - docker-build-ee-int-bors
-  - docker-build-explorer-bors
-
-# Release Branch Only
-- name: run-integration-tests-parallel-1
-  commands:
-  - "cd integration-testing"
-  - "./docker_run_tests.sh --unique_run_num 1"
-  environment:
-    _JAVA_OPTIONS: "-Xms2G -Xmx2G -XX:MaxMetaspaceSize=1G"
-  image: "casperlabs/buildenv:latest"
-  volumes:
-  - name: docker_sock
-    path: "/var/run/docker.sock"
-  - name: temp
-    path: "/tmp"
-  when:
-    branch:
-    - release-*
-  depends_on:
-  - docker-build-ee-int-bors
-  - docker-build-explorer-bors
-
-# Release Branch Only
-- name: run-integration-tests-parallel-2
-  commands:
-  - "cd integration-testing"
-  - "./docker_run_tests.sh --unique_run_num 2"
-  environment:
-    _JAVA_OPTIONS: "-Xms2G -Xmx2G -XX:MaxMetaspaceSize=1G"
-  image: "casperlabs/buildenv:latest"
-  volumes:
-  - name: docker_sock
-    path: "/var/run/docker.sock"
-  - name: temp
-    path: "/tmp"
-  when:
-    branch:
-    - release-*
-  depends_on:
-  - docker-build-ee-int-bors
-  - docker-build-explorer-bors
-
-# Release Branch Only
-- name: run-integration-tests-serial-3
-  commands:
-  - "cd integration-testing"
-  - "./docker_run_tests.sh --unique_run_num 3"
-  environment:
-    _JAVA_OPTIONS: "-Xms2G -Xmx2G -XX:MaxMetaspaceSize=1G"
-  image: "casperlabs/buildenv:latest"
-  volumes:
-  - name: docker_sock
-    path: "/var/run/docker.sock"
-  - name: temp
-    path: "/tmp"
-  when:
-    branch:
-    - release-*
-  depends_on:
-  - run-integration-tests-parallel-0
-  - run-integration-tests-parallel-1
-  - run-integration-tests-parallel-2
-
 # Dev branch only
 - name: run-integration-tests
   commands:
@@ -735,12 +654,8 @@ steps:
 - name: package-python-client
   image: "casperlabs/buildenv:latest"
   commands:
-  - "make build-client-contracts"
-  - "cd integration-testing"
-  - "pipenv sync"
-  - "cd client/CasperLabsClient"
-  - "pipenv run python3 setup.py sdist"
-  - "cp dist/casperlabs* ../../../artifacts/${DRONE_BRANCH}"
+  - "make build-python-client"
+  - "cp client-py/dist/casperlabs* artifacts/${DRONE_BRANCH}"
   when:
     branch:
     - dev
@@ -1011,12 +926,8 @@ steps:
 - name: package-python-client-tag
   image: "casperlabs/buildenv:latest"
   commands:
-  - "make build-client-contracts"
-  - "cd integration-testing"
-  - "pipenv sync"
-  - "cd client/CasperLabsClient"
-  - "pipenv run python3 setup.py sdist"
-  - "cp dist/casperlabs* ../../../artifacts/${DRONE_BRANCH}"
+  - "make build-python-client"
+  - "cp client-py/dist/casperlabs* artifacts/${DRONE_BRANCH}"
   when:
     ref:
     - refs/tags/v*
@@ -1103,8 +1014,8 @@ steps:
       from_secret: pypi_user
     password:
       from_secret: pypi_pass
-    setupfile: "integration-testing/client/CasperLabsClient/setup.py"
-    dist_dir: "integration-testing/client/CasperLabsClient/dist/"
+    setupfile: "client-py/setup.py"
+    dist_dir: "client-py/dist/"
     skip_build: true
   when:
     ref:
