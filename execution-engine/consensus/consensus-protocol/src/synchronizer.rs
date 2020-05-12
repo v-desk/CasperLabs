@@ -53,7 +53,7 @@ pub(crate) trait Synchronizer<NodeId, VId, V, C> {
 pub(crate) struct ConsensusValueDependencies<C: Hash + PartialEq + Eq, Id: Hash + PartialEq + Eq> {
     // Multiple vertices can be dependent on the same consensus value.
     cv_to_set: HashMap<C, Vec<Id>>,
-    // Each vertice can be depending on multiple consensus values.
+    // Each vertex can be depending on multiple consensus values.
     id_to_group: HashMap<Id, HashSet<C>>,
 }
 
