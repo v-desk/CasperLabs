@@ -1,6 +1,6 @@
 use crate::protocol_state::{Vertex, VertexId};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     hash::Hash,
 };
 
@@ -90,31 +90,24 @@ where
             None => Vec::new(),
             Some(dependent_vertices) => {
                 // Remove the consensus value from the set of values each vertex is waiting for.
-                dependent_vertices.iter().for_each(|vertex| {
-                    self.id_to_group
-                        .get_mut(vertex)
-                        .map(|consensus_values| consensus_values.remove(&c));
-                });
-
-                // Collect vertices that are not depending on anything else.
-                let completed_dependencies_refs: Vec<Id> = self
-                    .id_to_group
-                    .iter()
-                    .filter_map(|(vertex, consensus_values)| {
-                        if consensus_values.is_empty() {
-                            Some(vertex.clone())
+                dependent_vertices
+                    .into_iter()
+                    .filter(|vertex| {
+                        if let Entry::Occupied(mut consensus_values) =
+                            self.id_to_group.entry(vertex.clone())
+                        {
+                            consensus_values.get_mut().remove(&c);
+                            if consensus_values.get().is_empty() {
+                                consensus_values.remove();
+                                true
+                            } else {
+                                false
+                            }
                         } else {
-                            None
+                            false
                         }
                     })
-                    .collect();
-
-                // Remove vertices that have completed dependencies.
-                completed_dependencies_refs.iter().for_each(|vertex| {
-                    self.id_to_group.remove(vertex);
-                });
-
-                completed_dependencies_refs
+                    .collect()
             }
         }
     }
