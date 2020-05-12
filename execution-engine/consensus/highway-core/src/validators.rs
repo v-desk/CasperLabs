@@ -2,10 +2,10 @@ use std::{collections::HashMap, hash::Hash, iter::FromIterator};
 
 /// The index of a validator, in a list of all validators, ordered by ID.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct ValidatorIndex(pub usize);
+pub struct ValidatorIndex(pub u16);
 
-impl From<usize> for ValidatorIndex {
-    fn from(idx: usize) -> Self {
+impl From<u16> for ValidatorIndex {
+    fn from(idx: u16) -> Self {
         ValidatorIndex(idx)
     }
 }
@@ -31,12 +31,8 @@ pub struct Validators<VID: Eq + Hash> {
 }
 
 impl<VID: Eq + Hash> Validators<VID> {
-    pub fn index_of(&self, id: &VID) -> Option<ValidatorIndex> {
-        self.index_by_id.get(id).cloned()
-    }
-
-    pub fn id_of(&self, idx: ValidatorIndex) -> &VID {
-        &self.validators[idx.0].id
+    pub fn contains(&self, idx: ValidatorIndex) -> bool {
+        self.validators.len() > idx.0.into()
     }
 }
 
@@ -47,7 +43,7 @@ impl<VID: Ord + Hash + Clone> FromIterator<(VID, u64)> for Validators<VID> {
         let index_by_id = validators
             .iter()
             .enumerate()
-            .map(|(idx, val)| (val.id.clone(), ValidatorIndex(idx)))
+            .map(|(idx, val)| (val.id.clone(), ValidatorIndex(idx as u16)))
             .collect();
         Validators {
             index_by_id,
