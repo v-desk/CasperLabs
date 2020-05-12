@@ -171,8 +171,8 @@ where
         }
     }
 
-    fn get_vertices_by_id(&mut self, dependants: Vec<VId>) -> Vec<V> {
-        dependants
+    fn get_vertices_by_id(&mut self, vertex_ids: Vec<VId>) -> Vec<V> {
+        vertex_ids
             .into_iter()
             .filter_map(|vertex_id| self.vertex_by_vid.remove(&vertex_id))
             .collect()
