@@ -1,0 +1,8 @@
+[package]
+name = "synchronizer"
+version = "0.1.0"
+authors = ["Bartłomiej Kamiński <bart@casperlabs.io>"]
+edition = "2018"
+description = "A generic synchronizer for consensus protocols - an object capable of tracking missing dependencies and resolving them by communicating with other nodes"
+
+[dependencies]
