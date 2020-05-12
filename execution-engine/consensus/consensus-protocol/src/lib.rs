@@ -4,25 +4,24 @@ mod protocol_state;
 mod synchronizer;
 
 pub trait ConsensusContext {
-    // Consensus specific message.
-    // What gets sent over the wire is opaque to the networking layer,
-    // it is materialized to concrete type in the consensus protocol layer.
-    //
-    // Example ADT might be:
-    // enum Message {
-    //   NewVote(…),
-    //   NewBlock(…),
-    //   RequestDependency(…),
-    //   CreateVote
-    // }
-    //
-    // Note that some consensus protocols (like HoneyBadgerBFT) don't have dependencies,
-    // so it's not possible to differentiate between new message and dependency requests
-    // in consensus-agnostic layers.
+    /// Consensus specific message.
+    /// What gets sent over the wire is opaque to the networking layer,
+    /// it is materialized to concrete type in the consensus protocol layer.
+    ///
+    /// Example ADT might be:
+    /// enum Message {
+    ///   NewVote(…),
+    ///   NewBlock(…),
+    ///   RequestDependency(…),
+    /// }
+    ///
+    /// Note that some consensus protocols (like HoneyBadgerBFT) don't have dependencies,
+    /// so it's not possible to differentiate between new message and dependency requests
+    /// in consensus-agnostic layers.
     type IncomingMessage;
 
-    // A message that an instance of consensus protocol will create when
-    // it wants to participate in the consensus.
+    /// A message that an instance of consensus protocol will create when
+    /// it wants to participate in the consensus.
     type OutgoingMessage;
 
     type ConsensusValue: Hash + PartialEq + Eq;
