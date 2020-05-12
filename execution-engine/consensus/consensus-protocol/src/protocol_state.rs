@@ -5,7 +5,7 @@ pub(crate) trait VertexId {}
 pub(crate) trait Vertex<C, Id> {
     fn id(&self) -> Id;
 
-    fn values(&self) -> &[C];
+    fn values(&self) -> Vec<C>;
 }
 
 pub(crate) trait ProtocolState {
