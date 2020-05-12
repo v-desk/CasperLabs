@@ -214,7 +214,7 @@ where
         let completed_dependencies = self.complete_vertex_dependency(v);
         completed_dependencies
             .into_iter()
-            .map(|v| SynchronizerEffect::RequeueVertex(v))
+            .map(SynchronizerEffect::RequeueVertex)
             .collect()
     }
 
@@ -222,7 +222,7 @@ where
         let completed_dependencies = self.complete_consensus_value_dependency(c);
         completed_dependencies
             .into_iter()
-            .map(|v| SynchronizerEffect::RequeueVertex(v))
+            .map(SynchronizerEffect::RequeueVertex)
             .collect()
     }
 }

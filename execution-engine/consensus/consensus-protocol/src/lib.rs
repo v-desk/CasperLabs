@@ -1,4 +1,4 @@
-use std::{hash::Hash, time::Instant};
+use std::hash::Hash;
 
 mod protocol_state;
 mod synchronizer;

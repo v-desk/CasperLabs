@@ -61,10 +61,10 @@ where
                 Some(consensus) => consensus
                     .create_message()
                     .map(|out_msg| {
-                        let wire_msg: MessageWireFormat = out_msg.into();
+                        let _wire_msg: MessageWireFormat = out_msg.into();
                         todo!("Create an effect to broadcast new msg")
                     })
-                    .map_err(|err| ConsensusServiceError::InternalError(err)),
+                    .map_err(ConsensusServiceError::InternalError),
             },
             Event::IncomingMessage(wire_msg) => match self.active_eras.get(&wire_msg.era_id) {
                 None => todo!("Handle missing eras."),
@@ -75,9 +75,9 @@ where
                     consensus
                         .handle_message(message)
                         .map(|result| match result {
-                            ConsensusProtocolResult::InvalidIncomingMessage(msg, error) => {}
+                            ConsensusProtocolResult::InvalidIncomingMessage(_msg, _error) => {}
                             ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
-                                let wire_msg: MessageWireFormat = out_msg.into();
+                                let _wire_msg: MessageWireFormat = out_msg.into();
                                 todo!("Create an effect to broadcast new msg")
                             }
                         });
