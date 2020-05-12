@@ -73,12 +73,9 @@ where
     fn add(&mut self, c: C, id: Id) {
         self.cv_to_set
             .entry(c.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
-        self.id_to_group
-            .entry(id)
-            .or_insert_with(HashSet::new)
-            .insert(c);
+        self.id_to_group.entry(id).or_default().insert(c);
     }
 
     /// Remove a consensus value from dependencies.
