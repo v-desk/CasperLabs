@@ -45,5 +45,8 @@ pub trait ConsensusProtocol<Ctx: ConsensusContext> {
     ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
 
     /// Triggers consensus to create a new message.
-    fn handle_timer(&self, timer_id: TimerId) -> Result<Ctx::OutgoingMessage, anyhow::Error>;
+    fn handle_timer(
+        &self,
+        timer_id: TimerId,
+    ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
 }

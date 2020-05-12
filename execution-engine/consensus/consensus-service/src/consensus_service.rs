@@ -60,9 +60,14 @@ where
                 None => todo!("Handle missing eras."),
                 Some(consensus) => consensus
                     .handle_timer(timer_id)
-                    .map(|out_msg| {
-                        let _wire_msg: MessageWireFormat = out_msg.into();
-                        todo!("Create an effect to broadcast new msg")
+                    .map(|result| match result {
+                        ConsensusProtocolResult::InvalidIncomingMessage(_msg, _error) => {
+                            unimplemented!()
+                        }
+                        ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
+                            let _wire_msg: MessageWireFormat = out_msg.into();
+                            todo!("Create an effect to broadcast new msg")
+                        }
                     })
                     .map_err(ConsensusServiceError::InternalError),
             },
