@@ -1,4 +1,7 @@
-use crate::protocol_state::{Vertex, VertexId};
+use crate::{
+    protocol_state::{ProtocolState, Vertex, VertexId},
+    NodeId,
+};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     hash::Hash,
@@ -15,38 +18,6 @@ pub(crate) enum SynchronizerEffect<NodeId, VId, V, C> {
     RequestConsensusValues(NodeId, Vec<C>),
     // Effect for the reactor to requeue a vertex once its dependencies are downloaded.
     RequeueVertex(V),
-}
-
-pub(crate) trait Synchronizer<NodeId, VId, V, C> {
-    /// Synchronizes the consensus value the vertex is introducing to the protocol state.
-    /// It may be a single deploy, list of deploys, an integer value etc.
-    /// Implementations will know which values are missing
-    /// (ex. deploys in the local deploy buffer vs new deploys introduced by the block).
-    /// Node passed in is the one that proposed the original vertex. It should also have the missing
-    /// dependency.
-    fn sync_consensus_values(
-        &mut self,
-        node: NodeId,
-        c: Vec<C>,
-        v: V,
-    ) -> SynchronizerEffect<NodeId, VId, V, C>;
-
-    /// Synchronizes the dependency (single) of a newly received vertex.
-    /// In practice, this method will produce an effect that will be passed on to the reactor for
-    /// handling. Node passed in is the one that proposed the original vertex. It should also
-    /// have the missing dependency.
-    fn sync_dependency(
-        &mut self,
-        node: NodeId,
-        missing_dependency: VId,
-        new_vertex: V,
-    ) -> SynchronizerEffect<NodeId, VId, V, C>;
-
-    /// Must be called after consensus successfully handles the new vertex.
-    /// That's b/c there might be other vertices that depend on this one and are waiting in a queue.
-    fn on_vertex_synced(&mut self, v: VId) -> Vec<SynchronizerEffect<NodeId, VId, V, C>>;
-
-    fn on_consensus_value_synced(&mut self, c: C) -> Vec<SynchronizerEffect<NodeId, VId, V, C>>;
 }
 
 /// Structure that tracks which vertices wait for what consensus value dependencies.
@@ -110,7 +81,7 @@ where
     }
 }
 
-pub(crate) struct DagSynchronizerState<VId, V, C>
+pub(crate) struct DagSynchronizerState<VId, V, C, P>
 where
     C: Hash + PartialEq + Eq,
     VId: Hash + PartialEq + Eq,
@@ -122,19 +93,22 @@ where
     //TODO: Wrap the following with a struct that will keep the details hidden.
     vertex_dependants: HashMap<VId, Vec<VId>>,
     vertex_by_vid: HashMap<VId, V>,
+    protocol_state: P,
 }
 
-impl<C, VId: VertexId, V: Vertex<C, VId>> DagSynchronizerState<VId, V, C>
+impl<C, VId, V, P> DagSynchronizerState<VId, V, C, P>
 where
     C: Hash + PartialEq + Eq + Clone,
-    VId: Hash + PartialEq + Eq + Clone,
-    V: Clone,
+    VId: VertexId + Clone + Hash + Eq + PartialEq,
+    V: Vertex<C, VId> + Clone,
+    P: ProtocolState,
 {
-    fn new() -> Self {
+    fn new(protocol: P) -> Self {
         DagSynchronizerState {
             consensus_value_deps: ConsensusValueDependencies::new(),
             vertex_dependants: HashMap::new(),
             vertex_by_vid: HashMap::new(),
+            protocol_state: protocol,
         }
     }
 
@@ -155,6 +129,10 @@ where
         self.consensus_value_deps.add(c, dependant_id)
     }
 
+    /// Complete a vertex dependency (called when that vertex is downloaded from another node and
+    /// persisted). Returns list of vertices that were waiting on that vertex dependency.
+    /// Vertices returned have all of its dependencies completed - i.e. are not waiting for
+    /// anything else.
     fn complete_vertex_dependency(&mut self, v_id: VId) -> Vec<V> {
         match self.vertex_dependants.remove(&v_id) {
             None => Vec::new(),
@@ -162,6 +140,10 @@ where
         }
     }
 
+    /// Complete a consensus value dependency (called when that C is downloaded from another node).
+    /// Returns list of vertices that were waiting on the completion of that consensus value.
+    /// Vertices returned have all of its dependencies completed - i.e. are not waiting for anything
+    /// else.
     fn complete_consensus_value_dependency(&mut self, c: C) -> Vec<V> {
         let dependants = self.consensus_value_deps.remove(c);
         if dependants.is_empty() {
@@ -171,20 +153,20 @@ where
         }
     }
 
+    /// Helper method for returning list of vertices by its ID.
     fn get_vertices_by_id(&mut self, vertex_ids: Vec<VId>) -> Vec<V> {
         vertex_ids
             .into_iter()
             .filter_map(|vertex_id| self.vertex_by_vid.remove(&vertex_id))
             .collect()
     }
-}
 
-impl<NodeId, VId, V, C> Synchronizer<NodeId, VId, V, C> for DagSynchronizerState<VId, V, C>
-where
-    C: Clone + Hash + Eq + PartialEq,
-    VId: VertexId + Clone + Hash + Eq + PartialEq,
-    V: Vertex<C, VId> + Clone,
-{
+    /// Synchronizes the consensus value the vertex is introducing to the protocol state.
+    /// It may be a single deploy, list of deploys, an integer value etc.
+    /// Implementations will know which values are missing
+    /// (ex. deploys in the local deploy buffer vs new deploys introduced by the block).
+    /// Node passed in is the one that proposed the original vertex. It should also have the missing
+    /// dependency.
     fn sync_consensus_values(
         &mut self,
         node: NodeId,
@@ -197,6 +179,10 @@ where
         SynchronizerEffect::RequestConsensusValues(node, c)
     }
 
+    /// Synchronizes the dependency (single) of a newly received vertex.
+    /// In practice, this method will produce an effect that will be passed on to the reactor for
+    /// handling. Node passed in is the one that proposed the original vertex. It should also
+    /// have the missing dependency.
     fn sync_dependency(
         &mut self,
         node: NodeId,
@@ -207,6 +193,8 @@ where
         SynchronizerEffect::RequestVertex(node, missing_dependency)
     }
 
+    /// Must be called after consensus successfully handles the new vertex.
+    /// That's b/c there might be other vertices that depend on this one and are waiting in a queue.
     fn on_vertex_synced(&mut self, v: VId) -> Vec<SynchronizerEffect<NodeId, VId, V, C>> {
         let completed_dependencies = self.complete_vertex_dependency(v);
         completed_dependencies

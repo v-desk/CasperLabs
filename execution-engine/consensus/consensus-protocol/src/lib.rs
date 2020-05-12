@@ -6,6 +6,9 @@ mod synchronizer;
 #[derive(Debug, PartialEq, Eq)]
 pub struct TimerId(u64);
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct NodeId(u64);
+
 pub trait ConsensusContext {
     /// Consensus specific message.
     /// What gets sent over the wire is opaque to the networking layer,

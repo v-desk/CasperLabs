@@ -1,6 +1,7 @@
 //! WARNING:
 //! All of the following structs are stopgap solutions and will be entirely rewritten or replaced
 //! when we will have better understanding of the domain and reactor APIs.
+use consensus_protocol::NodeId;
 use std::time::Instant;
 
 // Very simple reactor effect.
@@ -23,6 +24,3 @@ pub struct MessageWireFormat {
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct EraId(u64);
-
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct NodeId(u64);
