@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::traits::{Effect, EraId, MessageWireFormat};
-use consensus_protocol::{ConsensusContext, ConsensusProtocol, ConsensusProtocolResult};
+use consensus_protocol::{ConsensusContext, ConsensusProtocol, ConsensusProtocolResult, TimerId};
 
 pub enum ConsensusServiceError {
     InvalidFormat(String),
@@ -21,7 +21,7 @@ pub enum ConsensusServiceError {
 
 pub enum Event {
     IncomingMessage(MessageWireFormat),
-    CreateMessage(EraId),
+    Timer(EraId, TimerId),
 }
 
 struct EraConfig {
@@ -56,10 +56,10 @@ where
 {
     fn handle_event(&mut self, event: Event) -> Result<Effect<Event>, ConsensusServiceError> {
         match event {
-            Event::CreateMessage(era_id) => match self.active_eras.get(&era_id) {
+            Event::Timer(era_id, timer_id) => match self.active_eras.get(&era_id) {
                 None => todo!("Handle missing eras."),
                 Some(consensus) => consensus
-                    .create_message()
+                    .handle_timer(timer_id)
                     .map(|out_msg| {
                         let _wire_msg: MessageWireFormat = out_msg.into();
                         todo!("Create an effect to broadcast new msg")

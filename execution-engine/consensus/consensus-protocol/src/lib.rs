@@ -3,6 +3,9 @@ use std::hash::Hash;
 mod protocol_state;
 mod synchronizer;
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct TimerId(u64);
+
 pub trait ConsensusContext {
     /// Consensus specific message.
     /// What gets sent over the wire is opaque to the networking layer,
@@ -42,5 +45,5 @@ pub trait ConsensusProtocol<Ctx: ConsensusContext> {
     ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
 
     /// Triggers consensus to create a new message.
-    fn create_message(&self) -> Result<Ctx::OutgoingMessage, anyhow::Error>;
+    fn handle_timer(&self, timer_id: TimerId) -> Result<Ctx::OutgoingMessage, anyhow::Error>;
 }
