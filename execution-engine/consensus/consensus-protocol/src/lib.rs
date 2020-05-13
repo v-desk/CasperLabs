@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::hash::Hash;
 
 mod protocol_state;
@@ -101,21 +102,16 @@ mod example {
             msg: <HighwayContext as ConsensusContext>::Message,
         ) -> Result<ConsensusProtocolResult<HighwayContext>, Error> {
             match msg {
-                HighwayMessage::RequestVertex(v_id) => unimplemented!(),
-                HighwayMessage::NewVertex(vertex) => unimplemented!(),
+                HighwayMessage::RequestVertex(_v_id) => unimplemented!(),
+                HighwayMessage::NewVertex(_vertex) => unimplemented!(),
             }
         }
 
         fn handle_timer(
             &self,
-            timer_id: TimerId,
+            _timer_id: TimerId,
         ) -> Result<ConsensusProtocolResult<HighwayContext>, Error> {
             unimplemented!()
         }
-    }
-
-    #[test]
-    fn foo() {
-        assert!(true)
     }
 }

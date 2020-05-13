@@ -76,7 +76,7 @@ where
                     let message: C::Message = wire_msg
                         .try_into()
                         .map_err(|_| ConsensusServiceError::InvalidFormat("".to_string()))?;
-                    consensus
+                    let _ = consensus
                         .handle_message(message)
                         .map(|result| match result {
                             ConsensusProtocolResult::InvalidIncomingMessage(_msg, _error) => {}

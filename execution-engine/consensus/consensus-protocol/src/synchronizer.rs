@@ -120,7 +120,7 @@ where
         self.protocol_state
             .get_vertex(v_id)
             .map_err(|err| anyhow::anyhow!("{:?}", err)) //TODO: Improve error reporting
-            .map(|o| SynchronizerEffect::RequestedVertexResponse(o))
+            .map(SynchronizerEffect::RequestedVertexResponse)
     }
 
     pub fn add_vertex(
