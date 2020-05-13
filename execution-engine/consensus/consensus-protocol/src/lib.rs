@@ -24,19 +24,15 @@ pub trait ConsensusContext {
     /// Note that some consensus protocols (like HoneyBadgerBFT) don't have dependencies,
     /// so it's not possible to differentiate between new message and dependency requests
     /// in consensus-agnostic layers.
-    type IncomingMessage;
-
-    /// A message that an instance of consensus protocol will create when
-    /// it wants to participate in the consensus.
-    type OutgoingMessage;
+    type Message;
 
     type ConsensusValue: Hash + PartialEq + Eq;
 }
 
 #[derive(Debug)]
 pub enum ConsensusProtocolResult<Ctx: ConsensusContext> {
-    CreatedNewMessage(Ctx::OutgoingMessage),
-    InvalidIncomingMessage(Ctx::IncomingMessage, anyhow::Error),
+    CreatedNewMessage(Ctx::Message),
+    InvalidIncomingMessage(Ctx::Message, anyhow::Error),
 }
 
 /// An API for a single instance of the consensus.
@@ -44,7 +40,7 @@ pub trait ConsensusProtocol<Ctx: ConsensusContext> {
     /// Handle an incoming message (like NewVote, RequestDependency).
     fn handle_message(
         &self,
-        msg: Ctx::IncomingMessage,
+        msg: Ctx::Message,
     ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
 
     /// Triggers consensus to create a new message.
@@ -88,28 +84,25 @@ mod example {
     struct DeployHash(u64);
 
     impl ConsensusContext for HighwayContext {
-        type IncomingMessage = HighwayIncomingMessage;
-        type OutgoingMessage = HighwayOutgoingMessage;
+        type Message = HighwayMessage;
         type ConsensusValue = DeployHash;
     }
 
-    enum HighwayIncomingMessage {
+    enum HighwayMessage {
         NewVertex(DummyVertex),
         RequestVertex(VIdU64),
     }
-
-    enum HighwayOutgoingMessage {}
 
     impl<P: ProtocolState<VIdU64, DummyVertex>> ConsensusProtocol<HighwayContext>
         for DagSynchronizerState<VIdU64, DummyVertex, DeployHash, P>
     {
         fn handle_message(
             &self,
-            msg: <HighwayContext as ConsensusContext>::IncomingMessage,
+            msg: <HighwayContext as ConsensusContext>::Message,
         ) -> Result<ConsensusProtocolResult<HighwayContext>, Error> {
             match msg {
-                HighwayIncomingMessage::RequestVertex(v_id) => unimplemented!(),
-                HighwayIncomingMessage::NewVertex(vertex) => unimplemented!(),
+                HighwayMessage::RequestVertex(v_id) => unimplemented!(),
+                HighwayMessage::NewVertex(vertex) => unimplemented!(),
             }
         }
 

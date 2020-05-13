@@ -51,8 +51,7 @@ struct EraSupervisor<C: ConsensusContext> {
 
 impl<C: ConsensusContext> ConsensusService for EraSupervisor<C>
 where
-    C::IncomingMessage: TryFrom<MessageWireFormat>,
-    C::OutgoingMessage: Into<MessageWireFormat>,
+    C::Message: TryFrom<MessageWireFormat> + Into<MessageWireFormat>,
 {
     fn handle_event(&mut self, event: Event) -> Result<Effect<Event>, ConsensusServiceError> {
         match event {
@@ -74,7 +73,7 @@ where
             Event::IncomingMessage(wire_msg) => match self.active_eras.get(&wire_msg.era_id) {
                 None => todo!("Handle missing eras."),
                 Some(consensus) => {
-                    let message: C::IncomingMessage = wire_msg
+                    let message: C::Message = wire_msg
                         .try_into()
                         .map_err(|_| ConsensusServiceError::InvalidFormat("".to_string()))?;
                     consensus
