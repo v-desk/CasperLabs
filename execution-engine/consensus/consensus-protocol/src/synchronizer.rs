@@ -105,7 +105,7 @@ where
     C: Hash + PartialEq + Eq + Clone,
     VId: VertexId + Clone + Hash + Eq + PartialEq,
     V: Vertex<C, VId> + Clone,
-    P: ProtocolState<Vertex = V, VertexId = VId>,
+    P: ProtocolState<VId, V>,
 {
     fn new(protocol: P) -> Self {
         DagSynchronizerState {

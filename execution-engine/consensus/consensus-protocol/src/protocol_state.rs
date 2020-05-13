@@ -8,13 +8,10 @@ pub(crate) trait Vertex<C, Id> {
     fn values(&self) -> Vec<C>;
 }
 
-pub(crate) trait ProtocolState {
-    type VertexId;
-    type Vertex;
-
+pub(crate) trait ProtocolState<VertexId, Vertex> {
     type Error: Debug;
 
-    fn add_vertex(&mut self, v: Self::Vertex) -> Result<Option<Self::VertexId>, Self::Error>;
+    fn add_vertex(&mut self, v: Vertex) -> Result<Option<VertexId>, Self::Error>;
 
-    fn get_vertex(&self, v: Self::VertexId) -> Result<Option<Self::Vertex>, Self::Error>;
+    fn get_vertex(&self, v: VertexId) -> Result<Option<Vertex>, Self::Error>;
 }

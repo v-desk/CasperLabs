@@ -100,8 +100,7 @@ mod example {
 
     enum HighwayOutgoingMessage {}
 
-    impl<P: ProtocolState<VertexId = VIdU64, Vertex = DummyVertex>>
-        ConsensusProtocol<HighwayContext>
+    impl<P: ProtocolState<VIdU64, DummyVertex>> ConsensusProtocol<HighwayContext>
         for DagSynchronizerState<VIdU64, DummyVertex, DeployHash, P>
     {
         fn handle_message(
