@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::fmt::Debug;
 
 pub(crate) trait VertexId {}
 
@@ -12,7 +12,7 @@ pub(crate) trait ProtocolState {
     type VertexId;
     type Vertex;
 
-    type Error;
+    type Error: Debug;
 
     fn add_vertex(&mut self, v: Self::Vertex) -> Result<Option<Self::VertexId>, Self::Error>;
 
