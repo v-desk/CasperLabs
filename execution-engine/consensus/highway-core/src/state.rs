@@ -193,22 +193,20 @@ impl<C: Context> State<C> {
     }
 
     /// Returns the hash of the message with the given sequence number from the sender of `hash`.
+    /// Panics if the sequence number is higher than that of the vote with `hash`.
     fn find_in_swimlane<'a>(
         &'a self,
         mut hash: &'a C::VoteHash,
         seq_number: u64,
     ) -> &'a C::VoteHash {
-        loop {
-            let vote = self.vote(hash);
-            if vote.seq_number == seq_number {
-                return hash;
-            }
-            hash = match vote.panorama.get(vote.sender) {
-                Observation::Correct(new_hash) => new_hash,
-                Observation::None => return hash,
-                _ => panic!("message cannot accuse its own sender"),
-            }
+        let mut vote = self.vote(hash);
+        assert!(vote.seq_number >= seq_number);
+        while vote.seq_number != seq_number {
+            // Unwrap: We only import votes that see the sender's previous message as correct.
+            hash = vote.panorama.get(vote.sender).correct().unwrap();
+            vote = self.vote(hash);
         }
+        hash
     }
 
     /// Returns `pan` is valid, i.e. it contains the latest votes of some substate of `self`.
