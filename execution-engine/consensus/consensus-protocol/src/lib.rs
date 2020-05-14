@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::hash::Hash;
+use std::{hash::Hash, time::Instant};
 
 mod protocol_state;
 mod synchronizer;
@@ -34,6 +34,7 @@ pub trait ConsensusContext {
 pub enum ConsensusProtocolResult<Ctx: ConsensusContext> {
     CreatedNewMessage(Ctx::Message),
     InvalidIncomingMessage(Ctx::Message, anyhow::Error),
+    ScheduleTimer(Instant, TimerId),
 }
 
 /// An API for a single instance of the consensus.

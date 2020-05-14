@@ -67,6 +67,9 @@ where
                             let _wire_msg: MessageWireFormat = out_msg.into();
                             todo!("Create an effect to broadcast new msg")
                         }
+                        ConsensusProtocolResult::ScheduleTimer(_delay, _timer_id) => {
+                            unimplemented!()
+                        }
                     })
                     .map_err(ConsensusServiceError::InternalError),
             },
@@ -83,6 +86,9 @@ where
                             ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
                                 let _wire_msg: MessageWireFormat = out_msg.into();
                                 todo!("Create an effect to broadcast new msg")
+                            }
+                            ConsensusProtocolResult::ScheduleTimer(_delay, _timer_id) => {
+                                unimplemented!()
                             }
                         });
                     Ok(Effect::Nothing)
