@@ -298,6 +298,8 @@ mod tests {
         type InstanceId = &'static str;
     }
 
+    /// Converts a string to an observation: "F" means faulty, "_" means none, and other strings
+    /// are used as the identifier ("hash") of a correct vote.
     fn to_obs(s: &&'static str) -> Observation<TestContext> {
         match *s {
             "_" => Observation::None,
@@ -306,11 +308,12 @@ mod tests {
         }
     }
 
+    /// Creates a panorama based on observation descriptions as in `to_obs`.
     fn panorama(observations: [&'static str; 3]) -> Panorama<TestContext> {
         Panorama(observations.iter().map(to_obs).collect())
     }
 
-    /// Creates a new vote. The hash should be a letter, followed by the sequence number.
+    /// Creates a new ballot vote. The hash must be a letter, followed by the sequence number.
     fn vote(
         hash: &'static str,
         sender: ValidatorIndex,
@@ -326,12 +329,14 @@ mod tests {
     }
 
     impl WireVote<TestContext> {
+        /// Adds values to the vote, turning it into a new block.
         fn val(mut self, values: Vec<&'static str>) -> Self {
             self.values = Some(values);
             self
         }
     }
 
+    /// Returns the cause of the error, dropping the `WireVote`.
     fn vote_err(err: AddVoteError<TestContext>) -> VoteError {
         err.cause
     }
