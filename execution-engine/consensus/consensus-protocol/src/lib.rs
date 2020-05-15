@@ -45,7 +45,7 @@ pub trait ConsensusProtocol<Ctx: ConsensusContext> {
         msg: Ctx::Message,
     ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
 
-    /// Triggers consensus to create a new message.
+    /// Triggers consensus' timer.
     fn handle_timer(
         &self,
         timer_id: TimerId,
