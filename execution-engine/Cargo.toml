@@ -10,6 +10,7 @@ members = [
     "consensus/highway-core",
     "consensus/consensus-protocol",
     "consensus/consensus-service",
+    "consensus/pothole",
     "contract",
     "contracts/[!.]*/*",
     "engine-core",
