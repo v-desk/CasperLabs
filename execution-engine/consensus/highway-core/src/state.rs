@@ -109,7 +109,7 @@ impl<C: Context> State<C> {
         self.update_panorama(&wvote);
         let hash = wvote.hash.clone();
         let fork_choice = self.fork_choice(&wvote.panorama).cloned();
-        let (vote, opt_values) = Vote::new(wvote, fork_choice.as_ref());
+        let (vote, opt_values) = Vote::new(wvote, fork_choice.as_ref(), self);
         if let Some(values) = opt_values {
             let block = Block::new(fork_choice, values, self);
             self.blocks.insert(hash.clone(), block);
@@ -194,19 +194,17 @@ impl<C: Context> State<C> {
 
     /// Returns the hash of the message with the given sequence number from the sender of `hash`.
     /// Panics if the sequence number is higher than that of the vote with `hash`.
-    fn find_in_swimlane<'a>(
-        &'a self,
-        mut hash: &'a C::VoteHash,
-        seq_number: u64,
-    ) -> &'a C::VoteHash {
-        let mut vote = self.vote(hash);
-        assert!(vote.seq_number >= seq_number);
-        while vote.seq_number != seq_number {
-            // Unwrap: We only import votes that see the sender's previous message as correct.
-            hash = vote.panorama.get(vote.sender).correct().unwrap();
-            vote = self.vote(hash);
+    fn find_in_swimlane<'a>(&'a self, hash: &'a C::VoteHash, seq_number: u64) -> &'a C::VoteHash {
+        let vote = self.vote(hash);
+        if vote.seq_number == seq_number {
+            return hash;
         }
-        hash
+        assert!(vote.seq_number > seq_number);
+        let diff = vote.seq_number - seq_number;
+        // We want to make the greatest step 2^i such that 2^i <= diff.
+        let max_i = log2(diff) as usize;
+        let i = max_i.min(vote.skip_idx.len() - 1);
+        self.find_in_swimlane(&vote.skip_idx[i], seq_number)
     }
 
     /// Returns `pan` is valid, i.e. it contains the latest votes of some substate of `self`.
@@ -232,13 +230,10 @@ impl<C: Context> State<C> {
 
     /// Returns `true` if `pan` sees the sender of `hash` as correct, and sees that vote.
     fn sees_correct(&self, pan: &Panorama<C>, hash: &C::VoteHash) -> bool {
-        match &pan.get(self.vote(hash).sender) {
-            Observation::Faulty | Observation::None => false,
-            Observation::Correct(seen_hash) => {
-                // TODO: Use skip lists, not recursion.
-                seen_hash == hash || self.sees_correct(&self.vote(seen_hash).panorama, hash)
-            }
-        }
+        let vote = self.vote(hash);
+        pan.get(vote.sender).correct().map_or(false, |latest_hash| {
+            hash == self.find_in_swimlane(latest_hash, vote.seq_number)
+        })
     }
 
     /// Returns whether `obs_l` can come later in time than `obs_r`.
@@ -262,6 +257,17 @@ impl<C: Context> State<C> {
             _ => None,
         }
     }
+}
+
+/// Returns the base-2 logarithm of `x`, rounded down,
+/// i.e. the greatest `i` such that `2.pow(i) <= x`.
+fn log2(x: u64) -> u32 {
+    // The least power of two that is strictly greater than x.
+    let next_pow2 = (x + 1).next_power_of_two();
+    // It's twice as big as the greatest power of two that is less or equal than x.
+    let prev_pow2 = next_pow2 >> 1;
+    // The number of trailing zeros is its base-2 logarithm.
+    prev_pow2.trailing_zeros()
 }
 
 #[cfg(test)]
@@ -386,5 +392,38 @@ mod tests {
         // The state's own panorama has been updated correctly.
         assert_eq!(state.panorama, panorama(["F", "b2", "c0"]));
         Ok(())
+    }
+
+    #[test]
+    fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
+        let mut state = State::new(NUM_VALIDATORS);
+        let a = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"];
+        state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).val(vec!["a"]))?;
+        for i in 1..a.len() {
+            state.add_vote(vote(a[i], ALICE, [a[i - 1], "_", "_"]))?;
+        }
+
+        // The predecessor with sequence number i should always equal a[i].
+        for j in (a.len() - 2)..a.len() {
+            for i in 0..j {
+                assert_eq!(&a[i], state.find_in_swimlane(&a[j], i as u64));
+            }
+        }
+
+        // The skip list index of a[k] includes a[k - 2^i] for each i such that 2^i divides k.
+        assert_eq!(&["a8"], &state.vote(&"a9").skip_idx.as_ref());
+        assert_eq!(
+            &["a7", "a6", "a4", "a0"],
+            &state.vote(&"a8").skip_idx.as_ref()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_log2() {
+        assert_eq!(2, log2(0b100));
+        assert_eq!(2, log2(0b101));
+        assert_eq!(2, log2(0b111));
+        assert_eq!(3, log2(0b1000));
     }
 }
