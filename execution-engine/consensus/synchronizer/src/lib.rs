@@ -1,6 +1,6 @@
 mod traits;
 
-use traits::{DependencySpec, HandleNewItemResult, ItemWithId, NodeId, ProtocolState};
+pub use traits::{DependencySpec, HandleNewItemResult, ItemWithId, NodeId, ProtocolState};
 
 use std::collections::HashMap;
 
