@@ -1,12 +1,12 @@
 mod traits;
 
-use traits::{ConsensusProtocol, DependencySpec, HandleNewItemResult, ItemWithId, NodeId};
+use traits::{DependencySpec, HandleNewItemResult, ItemWithId, NodeId, ProtocolState};
 
 use std::collections::HashMap;
 
 /// Data associated with an item in the queue that is still missing some dependencies
 #[derive(Debug)]
-struct QueueItem<N, C: ConsensusProtocol> {
+struct QueueItem<N, C: ProtocolState> {
     original_sender: N,
     item: <C::DepSpec as DependencySpec>::Item,
     dependencies: C::DepSpec,
@@ -15,7 +15,7 @@ struct QueueItem<N, C: ConsensusProtocol> {
 /// The main synchronizer struct - controlling which items have unresolved dependencies and
 /// handling requests and responses regarding dependency resolution
 #[derive(Debug, Default)]
-pub struct Synchronizer<N: NodeId, C: ConsensusProtocol> {
+pub struct Synchronizer<N: NodeId, C: ProtocolState> {
     dependency_queue: HashMap<<C::DepSpec as DependencySpec>::ItemId, QueueItem<N, C>>,
 }
 
@@ -28,12 +28,12 @@ pub enum SynchronizerMessage<D: DependencySpec> {
 
 /// Struct aggregating the results of satisfying a new dependency for the items in the queue
 #[derive(Debug)]
-struct SatisfiedDependenciesResult<N: NodeId, C: ConsensusProtocol> {
+struct SatisfiedDependenciesResult<N: NodeId, C: ProtocolState> {
     messages: Vec<(N, SynchronizerMessage<C::DepSpec>)>,
     satisfied_deps: Vec<ItemWithId<C::DepSpec>>,
 }
 
-impl<N: NodeId, C: ConsensusProtocol> Synchronizer<N, C> {
+impl<N: NodeId, C: ProtocolState> Synchronizer<N, C> {
     /// Creates a new synchronizer
     pub fn new() -> Self {
         Self {
@@ -60,7 +60,7 @@ impl<N: NodeId, C: ConsensusProtocol> Synchronizer<N, C> {
 
     fn handle_dependency_request(
         &mut self,
-        consensus: &mut C,
+        consensus: &C,
         sender: N,
         dependency_descr: <C::DepSpec as DependencySpec>::DependencyDescription,
     ) -> Vec<(N, SynchronizerMessage<C::DepSpec>)> {
@@ -85,14 +85,11 @@ impl<N: NodeId, C: ConsensusProtocol> Synchronizer<N, C> {
         match consensus.handle_new_item(item_id.clone(), item.clone()) {
             HandleNewItemResult::Accepted => {
                 let SatisfiedDependenciesResult {
-                    messages,
+                    mut messages,
                     satisfied_deps,
                 } = self.collect_satisfied_dependencies(item_id);
                 for ItemWithId { item_id, item } in satisfied_deps {
-                    match consensus.handle_new_item(item_id, item) {
-                        HandleNewItemResult::Accepted => (),
-                        _ => panic!("dependencies for an item should already have been satisfied, but weren't!")
-                    }
+                    messages.extend(self.handle_new_item(consensus, sender.clone(), item_id, item));
                 }
                 messages
             }
@@ -121,8 +118,8 @@ impl<N: NodeId, C: ConsensusProtocol> Synchronizer<N, C> {
     ) -> SatisfiedDependenciesResult<N, C> {
         let messages = self
             .dependency_queue
-            .iter_mut()
-            .filter_map(|(_, qitem)| {
+            .values_mut()
+            .filter_map(|qitem| {
                 if qitem.dependencies.resolve_dependency(new_item_id.clone()) {
                     qitem
                         .dependencies

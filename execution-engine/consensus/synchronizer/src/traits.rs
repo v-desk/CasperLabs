@@ -50,7 +50,7 @@ pub struct ItemWithId<D: DependencySpec> {
 /// messages of a consensus protocol can depend on other messages or other items - this interface
 /// makes it possible for the protocol to signal missing dependencies and let the synchronizer
 /// resolve them.
-pub trait ConsensusProtocol {
+pub trait ProtocolState {
     type DepSpec: DependencySpec;
 
     /// To be called when the synchronizer is asked for a missing dependency by another node.
