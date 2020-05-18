@@ -29,11 +29,12 @@
 
 pub mod active_validator;
 pub mod finality_detector;
-pub mod state;
+pub mod highway;
 pub mod traits;
 pub mod vertex;
 
 mod block;
 mod evidence;
+mod state;
 mod validators;
 mod vote;

@@ -20,8 +20,9 @@ pub trait ValidatorSecret: Debug {
 }
 
 /// The collection of types the user can choose for cryptography, IDs, transactions, etc.
-// TODO: The `Clone` trait bound makes `#[derive(Clone)]` work for `Block`...
-pub trait Context: Clone + Debug {
+// TODO: These trait bounds make `#[derive(...)]` work for types with a `C: Context` type
+// parameter. Split this up or replace the derives with explicit implementations.
+pub trait Context: Clone + Debug + PartialEq {
     /// The consensus value type, e.g. a list of transactions.
     type ConsensusValue: ConsensusValueT;
     /// Unique identifiers for validators.

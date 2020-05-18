@@ -1,4 +1,4 @@
-use crate::{traits::Context, vertex::WireVote};
+use crate::{traits::Context, validators::ValidatorIndex, vertex::WireVote};
 
 /// Evidence that a validator is faulty.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -11,9 +11,9 @@ impl<C: Context> Evidence<C> {
     // TODO: Verify whether the evidence is conclusive. Or as part of deserialization?
 
     /// Returns the ID of the faulty validator.
-    pub(crate) fn perpetrator(&self) -> &C::ValidatorId {
+    pub(crate) fn perpetrator(&self) -> ValidatorIndex {
         match self {
-            Evidence::Equivocation(vote0, _) => &vote0.sender,
+            Evidence::Equivocation(vote0, _) => vote0.sender,
         }
     }
 }

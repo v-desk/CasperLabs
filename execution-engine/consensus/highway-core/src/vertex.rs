@@ -37,8 +37,8 @@ impl<C: Context> Vertex<C> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WireVote<C: Context> {
     pub hash: C::VoteHash,
-    pub panorama: Panorama<C::VoteHash>,
-    pub sender: C::ValidatorId,
+    pub panorama: Panorama<C>,
+    pub sender: ValidatorIndex,
     pub values: Option<Vec<C::ConsensusValue>>,
     pub seq_number: u64,
 }
