@@ -511,7 +511,7 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
 
     def tryDownload(handle: Handle, source: Node, relay: Boolean) =
       for {
-        downloadable <- fetchAndRestore(source, id)
+        downloadable <- fetchAndRestore(source, handle)
         _            <- backend.validate(downloadable)
         _            <- backend.store(downloadable)
         _            <- relaying.relay(List(handle.id.toByteString)).whenA(relay)
@@ -585,7 +585,7 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
   }
 
   /** Download from the source node and decompress it. */
-  private def fetchAndRestore(source: Node, id: Identifier): F[Downloadable] = {
+  protected def fetchAndRestore(source: Node, handle: Handle): F[Downloadable] = {
     def invalid(msg: String) =
       GossipError.InvalidChunks(msg, source)
 
@@ -602,6 +602,8 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
       def append(data: ByteString): Acc =
         copy(totalSizeSoFar = totalSizeSoFar + data.size, chunks = data :: chunks)
     }
+
+    val id = handle.id
 
     val effect =
       for {

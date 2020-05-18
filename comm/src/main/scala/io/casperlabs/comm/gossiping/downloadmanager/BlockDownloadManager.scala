@@ -129,4 +129,16 @@ class BlockDownloadManagerImpl[F[_]](
     Iterant.liftF(itF).flatten
   }
   override def parseDownloadable(bytes: Array[Byte]) = Block.parseFrom(bytes)
+
+  override def fetchAndRestore(source: Node, summary: BlockSummary): F[Block] =
+    if (summary.getHeader.deployCount == 0) {
+      Block()
+        .withBlockHash(summary.blockHash)
+        .withHeader(summary.getHeader)
+        .withSignature(summary.getSignature)
+        .withBody(Block.Body())
+        .pure[F]
+    } else {
+      super.fetchAndRestore(source, summary)
+    }
 }
