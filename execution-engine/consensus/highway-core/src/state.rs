@@ -6,6 +6,7 @@ use thiserror::Error;
 use crate::{
     block::Block,
     evidence::Evidence,
+    tallies::Tallies,
     traits::Context,
     validators::ValidatorIndex,
     vertex::{Dependency, WireVote},
@@ -44,6 +45,8 @@ impl<C: Context> WireVote<C> {
 /// determine the outcome of the consensus process.
 #[derive(Debug)]
 pub struct State<C: Context> {
+    /// The validator's voting weights.
+    weights: Vec<u64>,
     /// All votes imported so far, by hash.
     // TODO: HashMaps prevent deterministic tests.
     votes: HashMap<C::VoteHash, Vote<C>>,
@@ -56,12 +59,13 @@ pub struct State<C: Context> {
 }
 
 impl<C: Context> State<C> {
-    pub fn new(num_validators: usize) -> State<C> {
+    pub fn new(weights: &[u64]) -> State<C> {
         State {
+            weights: weights.to_vec(),
             votes: HashMap::new(),
             blocks: HashMap::new(),
             evidence: HashMap::new(),
-            panorama: Panorama::new(num_validators),
+            panorama: Panorama::new(weights.len()),
         }
     }
 
@@ -186,10 +190,29 @@ impl<C: Context> State<C> {
         self.panorama.update(wvote.sender, new_obs);
     }
 
-    fn fork_choice(&self, pan: &Panorama<C>) -> Option<&C::VoteHash> {
-        // TODO! For now, just agrees with the first correct vote.
-        let hash = pan.0.iter().filter_map(Observation::correct).next()?;
-        Some(&self.vote(hash).block)
+    /// Returns the fork choice from `pan`'s view, or `None` if there are no blocks yet.
+    ///
+    /// The correct validators' latest votes count as votes for the block they point to, as well as
+    /// all of its ancestors. At each level the block with the highest score is selected from the
+    /// children of the previously selected block (or from all blocks at height 0), until a block
+    /// is reached that has no children with any votes.
+    fn fork_choice<'a>(&'a self, pan: &Panorama<C>) -> Option<&'a C::VoteHash> {
+        // Collect all correct votes in a `Tallies` map, sorted by height.
+        let to_entry = |(obs, w): (&Observation<C>, &u64)| {
+            let bhash = &self.vote(obs.correct()?).block;
+            Some((self.block(bhash).height, bhash, *w))
+        };
+        let mut tallies: Tallies<C> = pan.iter().zip(&self.weights).filter_map(to_entry).collect();
+        loop {
+            // Find the highest block that we know is an ancestor of the fork choice.
+            let (height, bhash) = tallies.find_decided(self)?;
+            // Drop all votes that are not descendants of `bhash`.
+            tallies = tallies.filter(height, bhash, self);
+            // If there are no blocks left, `bhash` itself is the fork choice. Otherwise repeat.
+            if tallies.is_empty() {
+                return Some(bhash);
+            }
+        }
     }
 
     /// Returns the hash of the message with the given sequence number from the sender of `hash`.
@@ -205,6 +228,25 @@ impl<C: Context> State<C> {
         let max_i = log2(diff) as usize;
         let i = max_i.min(vote.skip_idx.len() - 1);
         self.find_in_swimlane(&vote.skip_idx[i], seq_number)
+    }
+
+    pub fn find_ancestor<'a>(
+        &'a self,
+        hash: &'a C::VoteHash,
+        height: u64,
+    ) -> Option<&'a C::VoteHash> {
+        let block = self.block(hash);
+        if block.height < height {
+            return None;
+        }
+        if block.height == height {
+            return Some(hash);
+        }
+        let diff = block.height - height;
+        // We want to make the greatest step 2^i such that 2^i <= diff.
+        let max_i = (diff + 1).next_power_of_two().trailing_zeros() as usize - 1;
+        let i = max_i.min(block.skip_idx.len() - 1);
+        self.find_ancestor(&block.skip_idx[i], height)
     }
 
     /// Returns `pan` is valid, i.e. it contains the latest votes of some substate of `self`.
@@ -276,7 +318,7 @@ mod tests {
 
     use super::*;
 
-    const NUM_VALIDATORS: usize = 3;
+    const WEIGHTS: &[u64] = &[3, 4, 5];
 
     const ALICE: ValidatorIndex = ValidatorIndex(0);
     const BOB: ValidatorIndex = ValidatorIndex(1);
@@ -335,9 +377,15 @@ mod tests {
     }
 
     impl WireVote<TestContext> {
-        /// Adds values to the vote, turning it into a new block.
-        fn val(mut self, values: Vec<&'static str>) -> Self {
-            self.values = Some(values);
+        /// Adds a value to the vote, turning it into a new block.
+        fn val(mut self, value: &'static str) -> Self {
+            self.values = match self.values {
+                None => Some(vec![value]),
+                Some(mut values) => {
+                    values.push(value);
+                    Some(values)
+                }
+            };
             self
         }
     }
@@ -349,17 +397,17 @@ mod tests {
 
     #[test]
     fn add_vote() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(NUM_VALIDATORS);
+        let mut state = State::new(WEIGHTS);
 
-        // Create votes as follows:
+        // Create votes as follows; a0, b0 are blocks:
         //
         // Alice: a0 ————— a1
         //                /
         // Bob:   b0 —— b1
         //          \  /
         // Carol:    c0
-        state.add_vote(vote("a0", ALICE, ["_", "_", "_"]).val(vec!["a"]))?;
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val(vec!["b"]))?;
+        state.add_vote(vote("a0", ALICE, ["_", "_", "_"]).val("a"))?;
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val("b"))?;
         state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]))?;
         state.add_vote(vote("b1", BOB, ["_", "b0", "c0"]))?;
         state.add_vote(vote("a1", ALICE, ["a0", "b1", "c0"]))?;
@@ -396,9 +444,9 @@ mod tests {
 
     #[test]
     fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(NUM_VALIDATORS);
+        let mut state = State::new(WEIGHTS);
         let a = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"];
-        state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).val(vec!["a"]))?;
+        state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).val("a"))?;
         for i in 1..a.len() {
             state.add_vote(vote(a[i], ALICE, [a[i - 1], "_", "_"]))?;
         }
@@ -416,6 +464,33 @@ mod tests {
             &["a7", "a6", "a4", "a0"],
             &state.vote(&"a8").skip_idx.as_ref()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn fork_choice() -> Result<(), AddVoteError<TestContext>> {
+        let mut state = State::new(WEIGHTS);
+
+        // Create blocks with scores as follows:
+        //
+        //          a0: 7 — a1: 3
+        //        /       \
+        // b0: 12           b2: 4
+        //        \
+        //          c0: 5 — c1: 5
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val("B0"))?;
+        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).val("C0"))?;
+        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).val("C1"))?;
+        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).val("A0"))?;
+        state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]))?; // Just a ballot; not shown above.
+        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).val("A1"))?;
+        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).val("B2"))?;
+
+        // Alice built `a1` on top of `a0`, which had already 7 points.
+        assert_eq!(Some(&"a0"), state.block(&state.vote(&"a1").block).parent());
+        // The fork choice is now `b2`: At height 1, `a0` wins against `c0`.
+        // At height 2, `b2` wins against `a1`. `c1` has most points but is not a child of `a0`.
+        assert_eq!(Some(&"b2"), state.fork_choice(&state.panorama));
         Ok(())
     }
 

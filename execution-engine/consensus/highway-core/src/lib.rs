@@ -36,5 +36,6 @@ pub mod vertex;
 mod block;
 mod evidence;
 mod state;
+mod tallies;
 mod validators;
 mod vote;
