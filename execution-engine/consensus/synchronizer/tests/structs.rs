@@ -62,7 +62,7 @@ impl DependencySpec for MissingDeps {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Dag {
     heads: BTreeMap<NodeId, DagIndex>,
     nodes: BTreeMap<DagIndex, DagNode>,
