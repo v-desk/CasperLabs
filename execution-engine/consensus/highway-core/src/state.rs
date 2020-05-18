@@ -202,7 +202,7 @@ impl<C: Context> State<C> {
         assert!(vote.seq_number > seq_number);
         let diff = vote.seq_number - seq_number;
         // We want to make the greatest step 2^i such that 2^i <= diff.
-        let max_i = (diff + 1).next_power_of_two().trailing_zeros() as usize - 1;
+        let max_i = log2(diff) as usize;
         let i = max_i.min(vote.skip_idx.len() - 1);
         self.find_in_swimlane(&vote.skip_idx[i], seq_number)
     }
@@ -257,6 +257,17 @@ impl<C: Context> State<C> {
             _ => None,
         }
     }
+}
+
+/// Returns the base-2 logarithm of `x`, rounded down,
+/// i.e. the greatest `i` such that `2.pow(i) <= x`.
+fn log2(x: u64) -> u32 {
+    // The least power of two that is strictly greater than x.
+    let next_pow2 = (x + 1).next_power_of_two();
+    // It's twice as big as the greatest power of two that is less or equal than x.
+    let prev_pow2 = next_pow2 >> 1;
+    // The number of trailing zeros is its base-2 logarithm.
+    prev_pow2.trailing_zeros()
 }
 
 #[cfg(test)]
@@ -406,5 +417,13 @@ mod tests {
             &state.vote(&"a8").skip_idx.as_ref()
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_log2() {
+        assert_eq!(2, log2(0b100));
+        assert_eq!(2, log2(0b101));
+        assert_eq!(2, log2(0b111));
+        assert_eq!(3, log2(0b1000));
     }
 }
