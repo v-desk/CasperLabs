@@ -40,7 +40,7 @@ impl<C: Context> Panorama<C> {
 
     /// Returns the observation for the given validator. Panics if the index is out of range.
     pub fn get(&self, idx: ValidatorIndex) -> &Observation<C> {
-        &self.0[usize::from(idx.0)]
+        &self.0[idx.0 as usize]
     }
 
     /// Returns `true` if there is no correct observation yet.
@@ -53,13 +53,13 @@ impl<C: Context> Panorama<C> {
         self.0
             .iter()
             .enumerate()
-            .map(|(idx, obs)| (ValidatorIndex(idx as u16), obs))
+            .map(|(idx, obs)| (ValidatorIndex(idx as u32), obs))
     }
 
     /// Updates this panorama by adding one vote. Assumes that all justifications of that vote are
     /// already seen.
     pub fn update(&mut self, idx: ValidatorIndex, obs: Observation<C>) {
-        self.0[usize::from(idx.0)] = obs;
+        self.0[idx.0 as usize] = obs;
     }
 }
 
