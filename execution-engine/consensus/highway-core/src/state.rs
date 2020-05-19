@@ -313,22 +313,22 @@ fn log2(x: u64) -> u32 {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::traits::ValidatorSecret;
 
     use super::*;
 
-    const WEIGHTS: &[u64] = &[3, 4, 5];
+    pub const WEIGHTS: &[u64] = &[3, 4, 5];
 
-    const ALICE: ValidatorIndex = ValidatorIndex(0);
-    const BOB: ValidatorIndex = ValidatorIndex(1);
-    const CAROL: ValidatorIndex = ValidatorIndex(2);
+    pub const ALICE: ValidatorIndex = ValidatorIndex(0);
+    pub const BOB: ValidatorIndex = ValidatorIndex(1);
+    pub const CAROL: ValidatorIndex = ValidatorIndex(2);
 
     #[derive(Clone, Debug, PartialEq)]
-    struct TestContext;
+    pub struct TestContext;
 
     #[derive(Debug)]
-    struct TestSecret(u64);
+    pub struct TestSecret(u64);
 
     impl ValidatorSecret for TestSecret {
         type Signature = u64;
@@ -348,7 +348,7 @@ mod tests {
 
     /// Converts a string to an observation: "F" means faulty, "_" means none, and other strings
     /// are used as the identifier ("hash") of a correct vote.
-    fn to_obs(s: &&'static str) -> Observation<TestContext> {
+    pub fn to_obs(s: &&'static str) -> Observation<TestContext> {
         match *s {
             "_" => Observation::None,
             "F" => Observation::Faulty,
@@ -357,12 +357,12 @@ mod tests {
     }
 
     /// Creates a panorama based on observation descriptions as in `to_obs`.
-    fn panorama(observations: [&'static str; 3]) -> Panorama<TestContext> {
+    pub fn panorama(observations: [&'static str; 3]) -> Panorama<TestContext> {
         Panorama(observations.iter().map(to_obs).collect())
     }
 
     /// Creates a new ballot vote. The hash must be a letter, followed by the sequence number.
-    fn vote(
+    pub fn vote(
         hash: &'static str,
         sender: ValidatorIndex,
         observations: [&'static str; 3],
@@ -378,7 +378,7 @@ mod tests {
 
     impl WireVote<TestContext> {
         /// Adds a value to the vote, turning it into a new block.
-        fn val(mut self, value: &'static str) -> Self {
+        pub fn val(mut self, value: &'static str) -> Self {
             self.values = match self.values {
                 None => Some(vec![value]),
                 Some(mut values) => {

@@ -157,3 +157,70 @@ impl<'a, C: Context> Tallies<'a, C> {
             .or_insert_with(|| Tally::new(bhash, weight));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{tests::*, AddVoteError, State};
+
+    #[test]
+    fn tallies() -> Result<(), AddVoteError<TestContext>> {
+        let mut state = State::new(WEIGHTS);
+
+        // Create blocks with scores as follows:
+        //
+        //          a0: 7 — a1: 3
+        //        /       \
+        // b0: 12           b2: 4
+        //        \
+        //          c0: 5 — c1: 5
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val("B0"))?;
+        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).val("C0"))?;
+        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).val("C1"))?;
+        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).val("A0"))?;
+        state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]))?; // Just a ballot; not shown above.
+        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).val("A1"))?;
+        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).val("B2"))?;
+
+        // These are the entries of a panorama seeing `a1`, `b2` and `c0`.
+        let vote_entries = vec![(1, &"c0", 5), (2, &"a1", 3), (2, &"b2", 4)];
+        let tallies: Tallies<TestContext> = vote_entries.into_iter().collect();
+        assert_eq!(2, tallies.len());
+        assert_eq!(5, tallies[&1].weight()); // Carol's vote is on height 1.
+        assert_eq!(7, tallies[&2].weight()); // Alice's and Bob's votes are on height 2.
+
+        // Compute the tally at height 1: Take the parents of the blocks Alice and Bob vote for...
+        let mut h1_tally = tallies[&2].parents(&state);
+        // (Their votes have the same parent: `a0`.)
+        assert_eq!(7, h1_tally.votes[&"a0"]);
+        assert_eq!(1, h1_tally.votes.len());
+        // ...and adding Carol's vote.
+        h1_tally.extend(&tallies[&1]);
+        assert_eq!(2, h1_tally.votes.len());
+        assert_eq!(5, h1_tally.votes[&"c0"]);
+
+        // `find_decided` finds the fork choice in one step: On height 1, `a0` has the majority. On
+        // height 2, the child of `a0` with the highest score is `b2`.
+        assert_eq!(Some((2, &"b2")), tallies.find_decided(&state));
+
+        // But let's filter at level 1, and keep only the children of `a0`:
+        let tallies = tallies.filter(1, &"a0", &state);
+        assert_eq!(1, tallies.len());
+        assert_eq!(2, tallies[&2].votes.len());
+        assert_eq!(3, tallies[&2].votes[&"a1"]);
+        assert_eq!(4, tallies[&2].votes[&"b2"]);
+        Ok(())
+    }
+
+    #[test]
+    fn tally_try_from_iter() {
+        let tally: Option<Tally<TestContext>> = Tally::try_from_iter(vec![]);
+        assert!(tally.is_none());
+        let votes = vec![(&"a", 2), (&"b", 3), (&"a", 4), (&"c", 5), (&"b", 6)];
+        let tally: Tally<TestContext> = Tally::try_from_iter(votes).unwrap();
+        assert_eq!(9, tally.max_w());
+        assert_eq!(&"b", tally.max_bhash());
+        assert_eq!(20, tally.weight());
+        assert_eq!(6, tally.votes[&"a"]);
+    }
+}
