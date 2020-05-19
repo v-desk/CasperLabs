@@ -1,3 +1,5 @@
+use derive_more::Deref;
+
 use crate::{state::State, traits::Context, validators::ValidatorIndex, vertex::WireVote};
 
 /// The observed behavior of a validator at some point in time.
@@ -29,7 +31,7 @@ impl<C: Context> Observation<C> {
 }
 
 /// The observed behavior of all validators at some point in time.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deref, Eq, PartialEq)]
 pub struct Panorama<C: Context>(pub Vec<Observation<C>>);
 
 impl<C: Context> Panorama<C> {
@@ -45,13 +47,12 @@ impl<C: Context> Panorama<C> {
 
     /// Returns `true` if there is no correct observation yet.
     pub fn is_empty(&self) -> bool {
-        !self.0.iter().any(Observation::is_correct)
+        !self.iter().any(Observation::is_correct)
     }
 
     /// Returns an iterator over all observations, by validator index.
     pub fn enumerate(&self) -> impl Iterator<Item = (ValidatorIndex, &Observation<C>)> {
-        self.0
-            .iter()
+        self.iter()
             .enumerate()
             .map(|(idx, obs)| (ValidatorIndex(idx as u32), obs))
     }

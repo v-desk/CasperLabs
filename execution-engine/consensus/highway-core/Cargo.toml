@@ -9,5 +9,6 @@ repository = "https://github.com/CasperLabs/CasperLabs"
 license-file = "../LICENSE"
 
 [dependencies]
+derive_more = "0.99.7"
 displaydoc = "0.1.6"
 thiserror = "1.0.17"
