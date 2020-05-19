@@ -81,7 +81,12 @@ impl<'a, C: Context> Tally<'a, C> {
     }
 
     /// Returns a tally containing only the votes for descendants of `bhash`.
-    fn filter(self, height: u64, bhash: &'a C::VoteHash, state: &'a State<C>) -> Option<Self> {
+    fn filter_descendants(
+        self,
+        height: u64,
+        bhash: &'a C::VoteHash,
+        state: &'a State<C>,
+    ) -> Option<Self> {
         let iter = self.votes.into_iter();
         Self::try_from_iter(iter.filter(|&(b, _)| state.find_ancestor(b, height) == Some(bhash)))
     }
@@ -128,7 +133,7 @@ impl<'a, C: Context> Tallies<'a, C> {
             // the fork choice, or we can pick its highest scoring child from `prev_tally`.
             if h_tally.max_w() * 2 > total_weight {
                 return Some(
-                    match prev_tally.filter(height, h_tally.max_bhash(), state) {
+                    match prev_tally.filter_descendants(height, h_tally.max_bhash(), state) {
                         Some(filtered) => (height + 1, filtered.max_bhash()),
                         None => (height, h_tally.max_bhash()),
                     },
@@ -141,10 +146,16 @@ impl<'a, C: Context> Tallies<'a, C> {
     }
 
     /// Removes all votes for blocks that are not descendants of `bhash`.
-    pub fn filter(self, height: u64, bhash: &'a C::VoteHash, state: &'a State<C>) -> Self {
+    pub fn filter_descendants(
+        self,
+        height: u64,
+        bhash: &'a C::VoteHash,
+        state: &'a State<C>,
+    ) -> Self {
         // Each tally will be filtered to remove blocks incompatible with `bhash`.
-        let map_compatible =
-            |(h, t): (u64, Tally<'a, C>)| t.filter(height, bhash, state).map(|t| (h, t));
+        let map_compatible = |(h, t): (u64, Tally<'a, C>)| {
+            t.filter_descendants(height, bhash, state).map(|t| (h, t))
+        };
         // All tallies at `height` and lower can be removed, too.
         let relevant_heights = self.0.into_iter().rev().take_while(|(h, _)| *h > height);
         Tallies(relevant_heights.filter_map(map_compatible).collect())
@@ -204,7 +215,7 @@ mod tests {
         assert_eq!(Some((2, &"b2")), tallies.find_decided(&state));
 
         // But let's filter at level 1, and keep only the children of `a0`:
-        let tallies = tallies.filter(1, &"a0", &state);
+        let tallies = tallies.filter_descendants(1, &"a0", &state);
         assert_eq!(1, tallies.len());
         assert_eq!(2, tallies[&2].votes.len());
         assert_eq!(3, tallies[&2].votes[&"a1"]);

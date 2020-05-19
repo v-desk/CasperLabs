@@ -207,7 +207,7 @@ impl<C: Context> State<C> {
             // Find the highest block that we know is an ancestor of the fork choice.
             let (height, bhash) = tallies.find_decided(self)?;
             // Drop all votes that are not descendants of `bhash`.
-            tallies = tallies.filter(height, bhash, self);
+            tallies = tallies.filter_descendants(height, bhash, self);
             // If there are no blocks left, `bhash` itself is the fork choice. Otherwise repeat.
             if tallies.is_empty() {
                 return Some(bhash);
@@ -230,6 +230,8 @@ impl<C: Context> State<C> {
         self.find_in_swimlane(&vote.skip_idx[i], seq_number)
     }
 
+    /// Returns the ancestor of the block with the given `hash`, on the specified `height`, or
+    /// `None` if the block's height is lower than that.
     pub fn find_ancestor<'a>(
         &'a self,
         hash: &'a C::VoteHash,
@@ -244,7 +246,7 @@ impl<C: Context> State<C> {
         }
         let diff = block.height - height;
         // We want to make the greatest step 2^i such that 2^i <= diff.
-        let max_i = (diff + 1).next_power_of_two().trailing_zeros() as usize - 1;
+        let max_i = log2(diff) as usize;
         let i = max_i.min(block.skip_idx.len() - 1);
         self.find_ancestor(&block.skip_idx[i], height)
     }
