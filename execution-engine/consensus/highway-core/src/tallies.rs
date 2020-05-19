@@ -5,19 +5,22 @@ use std::{
 
 use derive_more::{Deref, DerefMut};
 
-use crate::{state::State, traits::Context};
+use crate::{
+    state::{State, Weight},
+    traits::Context,
+};
 
 /// A tally of votes at a specific height. This is never empty: It contains at least one vote.
 #[derive(Clone)]
 pub struct Tally<'a, C: Context> {
     /// The block with the highest weight, and the highest hash if there's a tie.
-    max: (u64, &'a C::VoteHash),
+    max: (Weight, &'a C::VoteHash),
     /// The total vote weight for each block.
-    votes: BTreeMap<&'a C::VoteHash, u64>,
+    votes: BTreeMap<&'a C::VoteHash, Weight>,
 }
 
-impl<'a, C: Context> Extend<(&'a C::VoteHash, u64)> for Tally<'a, C> {
-    fn extend<T: IntoIterator<Item = (&'a C::VoteHash, u64)>>(&mut self, iter: T) {
+impl<'a, C: Context> Extend<(&'a C::VoteHash, Weight)> for Tally<'a, C> {
+    fn extend<T: IntoIterator<Item = (&'a C::VoteHash, Weight)>>(&mut self, iter: T) {
         for (bhash, w) in iter {
             self.add(bhash, w);
         }
@@ -25,7 +28,7 @@ impl<'a, C: Context> Extend<(&'a C::VoteHash, u64)> for Tally<'a, C> {
 }
 
 impl<'a, 'b, C: Context> IntoIterator for &'b Tally<'a, C> {
-    type Item = (&'a C::VoteHash, u64);
+    type Item = (&'a C::VoteHash, Weight);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'b>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -35,7 +38,7 @@ impl<'a, 'b, C: Context> IntoIterator for &'b Tally<'a, C> {
 
 impl<'a, C: Context> Tally<'a, C> {
     /// Returns a new tally with a single entry.
-    fn new(bhash: &'a C::VoteHash, w: u64) -> Self {
+    fn new(bhash: &'a C::VoteHash, w: Weight) -> Self {
         Tally {
             max: (w, bhash),
             votes: iter::once((bhash, w)).collect(),
@@ -43,7 +46,7 @@ impl<'a, C: Context> Tally<'a, C> {
     }
 
     /// Creates a tally from a list of votes. Returns `None` if the iterator is empty.
-    fn try_from_iter<T: IntoIterator<Item = (&'a C::VoteHash, u64)>>(iter: T) -> Option<Self> {
+    fn try_from_iter<T: IntoIterator<Item = (&'a C::VoteHash, Weight)>>(iter: T) -> Option<Self> {
         let mut iter = iter.into_iter();
         let (bhash, w) = iter.next()?;
         let mut tally = Tally::new(bhash, w);
@@ -54,24 +57,25 @@ impl<'a, C: Context> Tally<'a, C> {
     /// Returns a new tally with the same votes, but one level lower: vote for a block counts as a
     /// vote for that block's parent. Panics if called on level 0.
     fn parents(&self, state: &'a State<C>) -> Self {
-        let to_parent = |(h, w): (&&'a C::VoteHash, &u64)| (state.block(*h).parent().unwrap(), *w);
+        let to_parent =
+            |(h, w): (&&'a C::VoteHash, &Weight)| (state.block(*h).parent().unwrap(), *w);
         Self::try_from_iter(self.votes.iter().map(to_parent)).unwrap()
     }
 
     /// Adds a vote for a block to the tally, possibly updating the current maximum.
-    fn add(&mut self, bhash: &'a C::VoteHash, weight: u64) {
+    fn add(&mut self, bhash: &'a C::VoteHash, weight: Weight) {
         let w = self.votes.entry(bhash).or_default();
         *w += weight;
         self.max = (*w, bhash).max(self.max);
     }
 
     /// Returns the total weight of the votes included in this tally.
-    fn weight(&self) -> u64 {
-        self.votes.values().sum()
+    fn weight(&self) -> Weight {
+        self.votes.values().cloned().sum()
     }
 
     /// Returns the maximum voting weight a single block received.
-    fn max_w(&self) -> u64 {
+    fn max_w(&self) -> Weight {
         self.max.0
     }
 
@@ -103,8 +107,8 @@ impl<'a, C: Context> Default for Tallies<'a, C> {
     }
 }
 
-impl<'a, C: Context> FromIterator<(u64, &'a C::VoteHash, u64)> for Tallies<'a, C> {
-    fn from_iter<T: IntoIterator<Item = (u64, &'a C::VoteHash, u64)>>(iter: T) -> Self {
+impl<'a, C: Context> FromIterator<(u64, &'a C::VoteHash, Weight)> for Tallies<'a, C> {
+    fn from_iter<T: IntoIterator<Item = (u64, &'a C::VoteHash, Weight)>>(iter: T) -> Self {
         let mut tallies = Self::default();
         for (height, bhash, weight) in iter {
             tallies.add(height, bhash, weight);
@@ -162,7 +166,7 @@ impl<'a, C: Context> Tallies<'a, C> {
     }
 
     /// Adds an entry to the tally at the specified `height`.
-    fn add(&mut self, height: u64, bhash: &'a C::VoteHash, weight: u64) {
+    fn add(&mut self, height: u64, bhash: &'a C::VoteHash, weight: Weight) {
         self.entry(height)
             .and_modify(|tally| tally.add(bhash, weight))
             .or_insert_with(|| Tally::new(bhash, weight));
@@ -194,21 +198,25 @@ mod tests {
         state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).val("B2"))?;
 
         // These are the entries of a panorama seeing `a1`, `b2` and `c0`.
-        let vote_entries = vec![(1, &"c0", 5), (2, &"a1", 3), (2, &"b2", 4)];
+        let vote_entries = vec![
+            (1, &"c0", Weight(5)),
+            (2, &"a1", Weight(3)),
+            (2, &"b2", Weight(4)),
+        ];
         let tallies: Tallies<TestContext> = vote_entries.into_iter().collect();
         assert_eq!(2, tallies.len());
-        assert_eq!(5, tallies[&1].weight()); // Carol's vote is on height 1.
-        assert_eq!(7, tallies[&2].weight()); // Alice's and Bob's votes are on height 2.
+        assert_eq!(Weight(5), tallies[&1].weight()); // Carol's vote is on height 1.
+        assert_eq!(Weight(7), tallies[&2].weight()); // Alice's and Bob's votes are on height 2.
 
         // Compute the tally at height 1: Take the parents of the blocks Alice and Bob vote for...
         let mut h1_tally = tallies[&2].parents(&state);
         // (Their votes have the same parent: `a0`.)
-        assert_eq!(7, h1_tally.votes[&"a0"]);
         assert_eq!(1, h1_tally.votes.len());
+        assert_eq!(Weight(7), h1_tally.votes[&"a0"]);
         // ...and adding Carol's vote.
         h1_tally.extend(&tallies[&1]);
         assert_eq!(2, h1_tally.votes.len());
-        assert_eq!(5, h1_tally.votes[&"c0"]);
+        assert_eq!(Weight(5), h1_tally.votes[&"c0"]);
 
         // `find_decided` finds the fork choice in one step: On height 1, `a0` has the majority. On
         // height 2, the child of `a0` with the highest score is `b2`.
@@ -218,8 +226,8 @@ mod tests {
         let tallies = tallies.filter_descendants(1, &"a0", &state);
         assert_eq!(1, tallies.len());
         assert_eq!(2, tallies[&2].votes.len());
-        assert_eq!(3, tallies[&2].votes[&"a1"]);
-        assert_eq!(4, tallies[&2].votes[&"b2"]);
+        assert_eq!(Weight(3), tallies[&2].votes[&"a1"]);
+        assert_eq!(Weight(4), tallies[&2].votes[&"b2"]);
         Ok(())
     }
 
@@ -227,11 +235,17 @@ mod tests {
     fn tally_try_from_iter() {
         let tally: Option<Tally<TestContext>> = Tally::try_from_iter(vec![]);
         assert!(tally.is_none());
-        let votes = vec![(&"a", 2), (&"b", 3), (&"a", 4), (&"c", 5), (&"b", 6)];
+        let votes = vec![
+            (&"a", Weight(2)),
+            (&"b", Weight(3)),
+            (&"a", Weight(4)),
+            (&"c", Weight(5)),
+            (&"b", Weight(6)),
+        ];
         let tally: Tally<TestContext> = Tally::try_from_iter(votes).unwrap();
-        assert_eq!(9, tally.max_w());
+        assert_eq!(Weight(9), tally.max_w());
         assert_eq!(&"b", tally.max_bhash());
-        assert_eq!(20, tally.weight());
-        assert_eq!(6, tally.votes[&"a"]);
+        assert_eq!(Weight(20), tally.weight());
+        assert_eq!(Weight(6), tally.votes[&"a"]);
     }
 }

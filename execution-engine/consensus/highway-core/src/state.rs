@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Mul};
 
+use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use displaydoc::Display;
 use thiserror::Error;
 
@@ -12,6 +13,20 @@ use crate::{
     vertex::{Dependency, WireVote},
     vote::{Observation, Panorama, Vote},
 };
+
+/// A vote weight.
+#[derive(
+    Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Add, Sub, AddAssign, SubAssign, Sum,
+)]
+pub struct Weight(pub u64);
+
+impl Mul<u64> for Weight {
+    type Output = Self;
+
+    fn mul(self, rhs: u64) -> Self {
+        Weight(self.0 * rhs)
+    }
+}
 
 /// An error that occurred when trying to add a vote.
 #[derive(Debug, Error)]
@@ -46,7 +61,7 @@ impl<C: Context> WireVote<C> {
 #[derive(Debug)]
 pub struct State<C: Context> {
     /// The validator's voting weights.
-    weights: Vec<u64>,
+    weights: Vec<Weight>,
     /// All votes imported so far, by hash.
     // TODO: HashMaps prevent deterministic tests.
     votes: HashMap<C::VoteHash, Vote<C>>,
@@ -59,7 +74,7 @@ pub struct State<C: Context> {
 }
 
 impl<C: Context> State<C> {
-    pub fn new(weights: &[u64]) -> State<C> {
+    pub fn new(weights: &[Weight]) -> State<C> {
         State {
             weights: weights.to_vec(),
             votes: HashMap::new(),
@@ -198,7 +213,7 @@ impl<C: Context> State<C> {
     /// is reached that has no children with any votes.
     fn fork_choice<'a>(&'a self, pan: &Panorama<C>) -> Option<&'a C::VoteHash> {
         // Collect all correct votes in a `Tallies` map, sorted by height.
-        let to_entry = |(obs, w): (&Observation<C>, &u64)| {
+        let to_entry = |(obs, w): (&Observation<C>, &Weight)| {
             let bhash = &self.vote(obs.correct()?).block;
             Some((self.block(bhash).height, bhash, *w))
         };
@@ -320,7 +335,7 @@ pub mod tests {
 
     use super::*;
 
-    pub const WEIGHTS: &[u64] = &[3, 4, 5];
+    pub const WEIGHTS: &[Weight] = &[Weight(3), Weight(4), Weight(5)];
 
     pub const ALICE: ValidatorIndex = ValidatorIndex(0);
     pub const BOB: ValidatorIndex = ValidatorIndex(1);
