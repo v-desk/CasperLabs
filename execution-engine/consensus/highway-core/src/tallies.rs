@@ -189,13 +189,13 @@ mod tests {
         // b0: 12           b2: 4
         //        \
         //          c0: 5 — c1: 5
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val("B0"))?;
-        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).val("C0"))?;
-        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).val("C1"))?;
-        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).val("A0"))?;
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("B0"))?;
+        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).with_value("C0"))?;
+        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).with_value("C1"))?;
+        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).with_value("A0"))?;
         state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]))?; // Just a ballot; not shown above.
-        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).val("A1"))?;
-        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).val("B2"))?;
+        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).with_value("A1"))?;
+        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).with_value("B2"))?;
 
         // These are the entries of a panorama seeing `a1`, `b2` and `c0`.
         let vote_entries = vec![

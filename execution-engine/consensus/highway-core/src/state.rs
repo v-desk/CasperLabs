@@ -395,7 +395,7 @@ pub mod tests {
 
     impl WireVote<TestContext> {
         /// Adds a value to the vote, turning it into a new block.
-        pub fn val(mut self, value: &'static str) -> Self {
+        pub fn with_value(mut self, value: &'static str) -> Self {
             self.values = match self.values {
                 None => Some(vec![value]),
                 Some(mut values) => {
@@ -423,8 +423,8 @@ pub mod tests {
         // Bob:   b0 —— b1
         //          \  /
         // Carol:    c0
-        state.add_vote(vote("a0", ALICE, ["_", "_", "_"]).val("a"))?;
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val("b"))?;
+        state.add_vote(vote("a0", ALICE, ["_", "_", "_"]).with_value("a"))?;
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("b"))?;
         state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]))?;
         state.add_vote(vote("b1", BOB, ["_", "b0", "c0"]))?;
         state.add_vote(vote("a1", ALICE, ["a0", "b1", "c0"]))?;
@@ -463,7 +463,7 @@ pub mod tests {
     fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
         let mut state = State::new(WEIGHTS);
         let a = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"];
-        state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).val("a"))?;
+        state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).with_value("a"))?;
         for i in 1..a.len() {
             state.add_vote(vote(a[i], ALICE, [a[i - 1], "_", "_"]))?;
         }
@@ -495,13 +495,13 @@ pub mod tests {
         // b0: 12           b2: 4
         //        \
         //          c0: 5 — c1: 5
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).val("B0"))?;
-        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).val("C0"))?;
-        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).val("C1"))?;
-        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).val("A0"))?;
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("B0"))?;
+        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).with_value("C0"))?;
+        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).with_value("C1"))?;
+        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).with_value("A0"))?;
         state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]))?; // Just a ballot; not shown above.
-        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).val("A1"))?;
-        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).val("B2"))?;
+        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).with_value("A1"))?;
+        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).with_value("B2"))?;
 
         // Alice built `a1` on top of `a0`, which had already 7 points.
         assert_eq!(Some(&"a0"), state.block(&state.vote(&"a1").block).parent());
