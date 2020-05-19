@@ -134,13 +134,8 @@ impl<N: NodeId, C: ProtocolState> Synchronizer<N, C> {
         let satisfied_ids = self
             .dependency_queue
             .iter()
-            .filter_map(|(item_id, qitem)| {
-                if qitem.dependencies.all_resolved() {
-                    Some(item_id.clone())
-                } else {
-                    None
-                }
-            })
+            .filter(|(_, qitem)| qitem.dependencies.all_resolved())
+            .map(|(item_id, _)| item_id.clone())
             .collect::<Vec<_>>();
         let satisfied_deps = satisfied_ids
             .into_iter()
