@@ -11,6 +11,7 @@ members = [
     "consensus/consensus-protocol",
     "consensus/consensus-service",
     "consensus/pothole",
+    "consensus/synchronizer",
     "contract",
     "contracts/[!.]*/*",
     "engine-core",
