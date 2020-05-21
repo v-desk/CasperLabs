@@ -7,7 +7,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(specialization, try_reserve)]
-#![doc(html_root_url = "https://docs.rs/casperlabs-types/0.4.1")]
+#![doc(html_root_url = "https://docs.rs/casperlabs-types/0.5.0")]
 #![doc(
     html_favicon_url = "https://raw.githubusercontent.com/CasperLabs/CasperLabs/dev/images/CasperLabs_Logo_Favicon_RGB_50px.png",
     html_logo_url = "https://raw.githubusercontent.com/CasperLabs/CasperLabs/dev/images/CasperLabs_Logo_Symbol_RGB.png",
@@ -35,7 +35,7 @@ mod phase;
 mod protocol_version;
 mod semver;
 pub mod system_contract_errors;
-mod system_contract_type;
+pub mod system_contract_type;
 mod transfer_result;
 mod uint;
 mod uref;

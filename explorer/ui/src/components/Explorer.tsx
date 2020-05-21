@@ -3,7 +3,6 @@ import { observer } from 'mobx-react';
 import {
   LinkButton,
   ListInline,
-  RefreshableComponent,
   shortHash
 } from './Utils';
 import { BlockDAG } from './BlockDAG';
@@ -18,17 +17,22 @@ import { BondedValidatorsTable } from './BondedValidatorsTable';
 import { ToggleButton } from './ToggleButton';
 import { BlockType, BlockRole, FinalityIcon } from './BlockDetails';
 
+const DEFAULT_DEPTH = 100;
+
 /** Show the tips of the DAG. */
 @observer
-class _Explorer extends RefreshableComponent<Props, {}> {
+class _Explorer extends React.Component<Props, {}> {
   constructor(props: Props) {
     super(props);
     this.refreshWithDepthAndMaxRank(props.maxRank, props.depth);
   }
 
-  refreshWithDepthAndMaxRank(maxRankStr: string | null, depthStr: string | null) {
+  refreshWithDepthAndMaxRank(
+    maxRankStr: string | null,
+    depthStr: string | null
+  ) {
     let maxRank = parseInt(maxRankStr || '') || 0;
-    let depth = parseInt(depthStr || '') || 10;
+    let depth = parseInt(depthStr || '') || DEFAULT_DEPTH;
     this.props.dag.updateMaxRankAndDepth(maxRank, depth);
     this.props.dag.refreshBlockDagAndSetupSubscriber();
   }
@@ -45,9 +49,8 @@ class _Explorer extends RefreshableComponent<Props, {}> {
   }
 
   componentWillUnmount() {
-    super.componentWillUnmount();
     // release websocket if necessary
-    this.props.dag.unsubscribe();
+    this.props.dag.toggleableSubscriber.unsubscribeAndFree();
   }
 
   render() {
@@ -64,7 +67,9 @@ class _Explorer extends RefreshableComponent<Props, {}> {
               }
               blocks={dag.blocks}
               refresh={() => this.refresh()}
-              subscribeToggleStore={dag.subscribeToggleStore}
+              subscribeToggleStore={
+                dag.toggleableSubscriber.subscribeToggleStore
+              }
               hideBallotsToggleStore={dag.hideBallotsToggleStore}
               hideBlockHashToggleStore={dag.hideBlockHashToggleStore}
               footerMessage={
@@ -75,7 +80,7 @@ class _Explorer extends RefreshableComponent<Props, {}> {
                     urlWithRankAndDepth={Pages.explorerWithMaxRankAndDepth}
                   />
                   {dag.hasBlocks && (
-                    <span>Select a block to see its details.</span>
+                    <span>Select a block to see its details. Press Ctrl before zooming to enable horizontal only zoom mode.</span>
                   )}
                   {dag.selectedBlock && (
                     <ToggleButton
@@ -91,7 +96,7 @@ class _Explorer extends RefreshableComponent<Props, {}> {
                 if (
                   current &&
                   current.getSummary()!.getBlockHash_asB64() ===
-                  block.getSummary()!.getBlockHash_asB64()
+                    block.getSummary()!.getBlockHash_asB64()
                 ) {
                   dag.selectedBlock = undefined;
                 } else {
@@ -102,17 +107,19 @@ class _Explorer extends RefreshableComponent<Props, {}> {
               depth={dag.depth}
               onDepthChange={d => {
                 dag.depth = d;
-                this.refresh();
+                this.props.history.push(
+                  Pages.explorerWithMaxRankAndDepth(dag.maxRank, dag.depth)
+                );
               }}
               width="100%"
               height="600"
             />
           </div>
-          {dag.selectedBlock && (
+          {dag.selectedBlock && dag.blocks != null && (
             <div className="col-sm-12 col-lg-4">
               <BlockDetails
                 block={dag.selectedBlock}
-                blocks={dag.blocks!}
+                blocks={dag.blocks}
                 onSelect={blockHashBase16 => {
                   dag.selectByBlockHashBase16(blockHashBase16);
                 }}
@@ -237,35 +244,16 @@ class BlockDetails extends React.Component<
           title={`Block ${shortHash(id)}`}
           headers={[]}
           rows={attrs}
-          renderRow={(attr, i) =>
+          renderRow={(attr, i) => (
             <tr key={i}>
               <th>{attr[0]}</th>
               <td>{attr[1]}</td>
             </tr>
-          }
+          )}
           footerMessage="Click the links to select the parents and children."
         />
       </div>
     );
-  }
-
-  componentDidMount() {
-    // Scroll into view so people realize it's there.
-    this.scrollToBlockDetails();
-  }
-
-  scrollToBlockDetails() {
-    let container = $(this.ref!);
-    let offset = container.offset()!;
-    let height = container.height()!;
-    $('html, body')
-      .stop()
-      .animate(
-        {
-          scrollTop: offset.top + height
-        },
-        1000
-      );
   }
 }
 

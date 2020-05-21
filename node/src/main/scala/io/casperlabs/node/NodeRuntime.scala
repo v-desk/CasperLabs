@@ -36,7 +36,7 @@ import io.casperlabs.comm.rp._
 import io.casperlabs.ipc.ChainSpec
 import io.casperlabs.mempool.DeployBuffer
 import io.casperlabs.metrics.Metrics
-import io.casperlabs.node.api.EventStream
+import io.casperlabs.node.api.{EventStream, VersionInfo}
 import io.casperlabs.node.api.graphql.FinalizedBlocksStream
 import io.casperlabs.node.casper.consensus.Consensus
 import io.casperlabs.node.configuration.Configuration
@@ -55,6 +55,7 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.Location
 
 import scala.concurrent.duration._
+import io.casperlabs.comm.gossiping.relaying.DeployRelaying
 
 class NodeRuntime private[node] (
     conf: Configuration,
@@ -142,6 +143,8 @@ class NodeRuntime private[node] (
                                             transactEC = dbIOScheduler
                                           )
       _ <- Resource.liftF(runRdmbsMigrations(conf.server.dataDir))
+
+      _ <- effects.periodicStorageSizeMetrics(conf)
 
       implicit0(
         storage: SQLiteStorage.CombinedStorage[Task]
@@ -296,15 +299,18 @@ class NodeRuntime private[node] (
                      onInitialSyncCompleted = blockApiLock.releaseN(1) *> isSyncedRef.set(true)
                    )
 
+      blockRelaying                                   = relaying._1
+      implicit0(deployRelaying: DeployRelaying[Task]) = relaying._2
+
       // Update the relaying we passed to consensus to use the real one.
-      _ <- Resource.liftF(relayingProxy.set(relaying))
+      _ <- Resource.liftF(relayingProxy.set(blockRelaying))
 
       // The BlockAPI does relaying of blocks its creating on its own and wants to have a broadcaster.
       implicit0(broadcaster: Broadcaster[Task]) <- Resource.liftF(
                                                     MultiParentCasperImpl.Broadcaster
                                                       .fromGossipServices(
                                                         maybeValidatorId,
-                                                        relaying
+                                                        blockRelaying
                                                       )
                                                       .pure[Task]
                                                   )
@@ -479,7 +485,8 @@ class NodeRuntime private[node] (
         conf.server.port,
         conf.server.kademliaPort,
         conf.server.noUpnp,
-        id
+        id,
+        VersionInfo.get
       )
 
   private def initPeers[F[_]: MonadThrowable]: F[List[NodeWithoutChainId]] =

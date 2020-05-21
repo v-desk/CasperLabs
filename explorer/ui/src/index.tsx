@@ -5,12 +5,8 @@ import { HashRouter } from 'react-router-dom';
 import * as serviceWorker from './serviceWorker';
 import App from './components/App';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
-// https://startbootstrap.com/template-overviews/sb-admin/
-import './styles/sb-admin/sb-admin.scss';
 import './styles/custom.scss';
-
 // Make `jQuery` available in the window in case any Javascript we import directly uses it.
 import * as jQuery from 'jquery';
 
@@ -33,6 +29,7 @@ import AccountSelectorContainer from './containers/AccountSelectorContainer';
 import ConnectedPeersContainer from './containers/ConnectedPeersContainer';
 import { VestingContainer } from './contracts/Vesting/container/VestingContainer';
 import { DeployContractsContainer } from './containers/DeployContractsContainer';
+import ValidatorsContainer from './containers/ValidatorsContainer';
 
 let w = window as any;
 w.$ = w.jQuery = jQuery;
@@ -74,6 +71,7 @@ const search = new SearchContainer(errors, casperService);
 const accountSelectorContainer = new AccountSelectorContainer();
 const connectedPeersContainer = new ConnectedPeersContainer(errors, diagnosticsService);
 const deployContractsContainer = new DeployContractsContainer(errors, casperService);
+const validatorsContainer = new ValidatorsContainer(errors, casperService);
 
 ReactDOM.render(
   <HashRouter>
@@ -83,6 +81,7 @@ ReactDOM.render(
       faucet={faucet}
       vesting={vesting}
       dag={dag}
+      validatorsContainer={validatorsContainer}
       block={block}
       deploy={deploy}
       deployInfoList={deployInfoList}

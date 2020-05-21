@@ -1,6 +1,8 @@
 use contract::args_parser::ArgsParser;
 use engine_test_support::{
-    internal::{utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_GENESIS_CONFIG},
+    internal::{
+        utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_RUN_GENESIS_REQUEST,
+    },
     DEFAULT_ACCOUNT_ADDR,
 };
 use types::{ApiError, U512};
@@ -24,7 +26,7 @@ fn call_get_arg(args: impl ArgsParser) -> Result<(), String> {
     let exec_request =
         ExecuteRequestBuilder::standard(DEFAULT_ACCOUNT_ADDR, CONTRACT_GET_ARG, args).build();
     let result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request)
         .commit()
         .finish();
@@ -56,14 +58,14 @@ fn should_revert_with_missing_arg() {
     assert!(call_get_arg(())
         .expect_err("should fail")
         .contains(&format!(
-            "Revert({})",
-            u32::from(ApiError::User(GetArgContractError::MissingArgument0 as u16))
+            "{:?}",
+            ApiError::User(GetArgContractError::MissingArgument0 as u16),
         )));
     assert!(call_get_arg((String::from(ARG0_VALUE),))
         .expect_err("should fail")
         .contains(&format!(
-            "Revert({})",
-            u32::from(ApiError::User(GetArgContractError::MissingArgument1 as u16))
+            "{:?}",
+            ApiError::User(GetArgContractError::MissingArgument1 as u16),
         )));
 }
 
@@ -73,8 +75,8 @@ fn should_revert_with_invalid_argument() {
     assert!(call_get_arg((U512::from(123),))
         .expect_err("should fail")
         .contains(&format!(
-            "Revert({})",
-            u32::from(ApiError::User(GetArgContractError::InvalidArgument0 as u16))
+            "{:?}",
+            ApiError::User(GetArgContractError::InvalidArgument0 as u16)
         )));
     assert!(call_get_arg((
         String::from(ARG0_VALUE),
@@ -82,7 +84,7 @@ fn should_revert_with_invalid_argument() {
     ))
     .expect_err("should fail")
     .contains(&format!(
-        "Revert({})",
-        u32::from(ApiError::User(GetArgContractError::InvalidArgument1 as u16))
+        "{:?}",
+        ApiError::User(GetArgContractError::InvalidArgument1 as u16),
     )));
 }

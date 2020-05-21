@@ -35,7 +35,7 @@ fn should_fail_unboding_more_than_it_was_staked_ee_598_regression() {
         tmp
     };
 
-    let genesis_config = utils::create_genesis_config(accounts);
+    let run_genesis_request = utils::create_run_genesis_request(accounts);
 
     let exec_request_1 = ExecuteRequestBuilder::standard(
         DEFAULT_ACCOUNT_ADDR,
@@ -59,7 +59,7 @@ fn should_fail_unboding_more_than_it_was_staked_ee_598_regression() {
     };
 
     let result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&genesis_config)
+        .run_genesis(&run_genesis_request)
         .exec(exec_request_1)
         .expect_success()
         .commit()
@@ -75,11 +75,9 @@ fn should_fail_unboding_more_than_it_was_staked_ee_598_regression() {
     let error_message = utils::get_error_message(response);
 
     if !cfg!(feature = "enable-bonding") {
-        assert!(error_message.contains(&format!("Revert({})", u32::from(ApiError::Unhandled))));
+        assert!(error_message.contains(&format!("{:?}", ApiError::Unhandled)));
     } else {
         // Error::UnbondTooLarge => 7,
-        assert!(
-            error_message.contains(&format!("Revert({})", u32::from(ApiError::ProofOfStake(7))))
-        );
+        assert!(error_message.contains(&format!("{:?}", ApiError::ProofOfStake(7))));
     }
 }

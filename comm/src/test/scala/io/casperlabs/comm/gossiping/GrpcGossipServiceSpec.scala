@@ -25,6 +25,7 @@ import io.casperlabs.models.DeployImplicits._
 import io.casperlabs.models.PartialPrettifier
 import io.casperlabs.shared.Sorting._
 import io.casperlabs.shared.{Compression, Log}
+import io.casperlabs.shared.ByteStringPrettyPrinter.byteStringShow
 import io.grpc.netty.{NegotiationType, NettyChannelBuilder}
 import io.netty.handler.ssl.ClientAuth
 import monix.eval.Task
@@ -87,15 +88,10 @@ class GrpcGossipServiceSpec
       StreamAncestorBlockSummariesSpec,
       StreamLatestMessagesSpec,
       NewBlocksSpec,
+      NewDeploysSpec,
       GenesisApprovalSpec,
       StreamDagSliceBlockSummariesSpec
-    ) ++ {
-      if (sys.env.contains("DRONE_BRANCH")) Vector.empty
-      else
-        Vector(
-          NewDeploysSpec // TODO (NODE-1354)
-        )
-    }
+    )
 
   trait AuthSpec extends WordSpecLike {
     implicit val hashGen: Arbitrary[ByteString] = Arbitrary(genHash)
@@ -297,10 +293,10 @@ class GrpcGossipServiceSpec
     implicit val propCheckConfig         = PropertyCheckConfiguration(minSuccessful = 1)
     implicit override val patienceConfig = PatienceConfig(15.seconds, 500.millis)
     implicit override val consensusConfig = ConsensusConfig(
-      maxSessionCodeBytes = 700 * 1024,
-      minSessionCodeBytes = 400 * 1024,
-      maxPaymentCodeBytes = 600 * 1024,
-      minPaymentCodeBytes = 100 * 1024
+      maxSessionCodeBytes = 200 * 1024,
+      minSessionCodeBytes = 100 * 1024,
+      maxPaymentCodeBytes = 50 * 1024,
+      minPaymentCodeBytes = 10 * 1024
     )
 
     override def rpcName: String = "getBlocksChunked"
@@ -321,42 +317,67 @@ class GrpcGossipServiceSpec
     "getBlocksChunked" when {
       "called with a valid sender" when {
         "no compression is supported" when {
-          def test(excludeDeployBodies: Boolean): Unit = forAll { block: Block =>
-            runTestUnsafe(TestData.fromBlock(block), timeout = 15.seconds) {
-              val req = GetBlockChunkedRequest(
-                blockHash = block.blockHash,
-                excludeDeployBodies = excludeDeployBodies
-              )
-              stub.getBlockChunked(req).toListL.map { chunks =>
-                chunks.head.content.isHeader shouldBe true
-                val header = chunks.head.getHeader
-                header.compressionAlgorithm shouldBe ""
-                chunks.size should be > 1
+          def test(excludeDeployBodies: Boolean, onlyIncludeDeployHashes: Boolean): Unit = forAll {
+            block: Block =>
+              runTestUnsafe(TestData.fromBlock(block), timeout = 15.seconds) {
+                val req = GetBlockChunkedRequest(
+                  blockHash = block.blockHash,
+                  excludeDeployBodies = excludeDeployBodies,
+                  onlyIncludeDeployHashes = onlyIncludeDeployHashes
+                )
+                stub.getBlockChunked(req).toListL.map { chunks =>
+                  chunks.head.content.isHeader shouldBe true
+                  val header = chunks.head.getHeader
+                  header.compressionAlgorithm shouldBe ""
+                  chunks.size should be > 1
 
-                Inspectors.forAll(chunks.tail) { chunk =>
-                  chunk.content.isData shouldBe true
-                  chunk.getData.size should be <= DefaultMaxChunkSize
+                  Inspectors.forAll(chunks.tail) { chunk =>
+                    chunk.content.isData shouldBe true
+                    chunk.getData.size should be <= DefaultMaxChunkSize
+                  }
+
+                  val content = chunks.tail.flatMap(_.getData.toByteArray).toArray
+
+                  val expectedDeploys =
+                    if (onlyIncludeDeployHashes) {
+                      block.getBody.deploys.map { pd =>
+                        pd.withDeploy(Deploy(pd.getDeploy.deployHash))
+                      }
+                    } else if (excludeDeployBodies) {
+                      block.getBody.deploys.map { pd =>
+                        pd.withDeploy(pd.getDeploy.clearBody)
+                      }
+                    } else block.getBody.deploys
+
+                  val expectedBlock = block.withBody(block.getBody.withDeploys(expectedDeploys))
+
+                  val expected = expectedBlock.toByteArray
+
+                  header.contentLength shouldBe content.length
+                  header.originalContentLength shouldBe expected.length
+                  md5(content) shouldBe md5(expected)
                 }
-
-                val content = chunks.tail.flatMap(_.getData.toByteArray).toArray
-                val original =
-                  (if (excludeDeployBodies) block.clearDeployBodies else block).toByteArray
-                header.contentLength shouldBe content.length
-                header.originalContentLength shouldBe original.length
-                md5(content) shouldBe md5(original)
               }
-            }
           }
 
           "specified to exclude deploys bodies" should {
             "return a stream of uncompressed chunks with deploys bodies excluded" in test(
-              excludeDeployBodies = true
+              excludeDeployBodies = true,
+              onlyIncludeDeployHashes = false
+            )
+          }
+
+          "specified to only include deploys hashes" should {
+            "return a stream of uncompressed chunks with only deploy hashes" in test(
+              excludeDeployBodies = false,
+              onlyIncludeDeployHashes = true
             )
           }
 
           "specified to return full blocks" should {
             "return a stream of uncompressed chunks with deploys bodies included" in test(
-              excludeDeployBodies = false
+              excludeDeployBodies = false,
+              onlyIncludeDeployHashes = false
             )
           }
         }
@@ -492,7 +513,7 @@ class GrpcGossipServiceSpec
           "only allow them up to the limit" in {
             val maxParallelBlockDownloads = 2
             forAll { block: Block =>
-              runTestUnsafe(TestData.fromBlock(block), timeout = 15.seconds) {
+              runTestUnsafe(TestData.fromBlock(block), timeout = 20.seconds) {
                 TestEnvironment(
                   testDataRef,
                   maxParallelBlockDownloads = maxParallelBlockDownloads,
@@ -1100,26 +1121,13 @@ class GrpcGossipServiceSpec
     }
   }
 
-  object NewDeploysSpec extends WordSpecLike with AuthSpec {
-    override def rpcName: String = "newDeploys"
+  object NewDeploysSpec extends WordSpecLike {
 
-    override def query
-        : (Option[Node], List[ByteString]) => GossipingGrpcMonix.GossipServiceStub => Task[Unit] =
-      (maybeSender, blockHashes) =>
-        client => client.newBlocks(NewBlocksRequest(maybeSender, blockHashes)).void
+    implicit val consensusConfig =
+      ConsensusConfig(dagSize = 10, maxSessionCodeBytes = 50, maxPaymentCodeBytes = 10)
+    implicit val patienceConfig = PatienceConfig(5.second, 250.millis)
 
-    override def ignoreSender: Boolean = false
-
-    def expectError(
-        req: NewBlocksRequest,
-        client: GossipingGrpcMonix.GossipServiceStub = stub
-    )(pf: PartialFunction[Throwable, Unit]): Task[Unit] =
-      client.newBlocks(req).attempt.map { res =>
-        res.isLeft shouldBe true
-        pf.lift(res.left.get) getOrElse {
-          fail(s"Unexpected error: ${res.left.get}")
-        }
-      }
+    implicit def noShrinkAny[T]: Shrink[T] = Shrink.shrinkAny
 
     "newDeploys" when {
       "called with a valid sender" when {
@@ -1128,17 +1136,18 @@ class GrpcGossipServiceSpec
         "receives no previously unknown deploys" should {
           "return false and not download anything" in {
             val genTestCase = for {
-              deploys <- Gen.nonEmptyListOf(arbDeploy.arbitrary)
+              n       <- Gen.choose(1, 10)
+              deploys <- Gen.listOfN(n, arbDeploy.arbitrary)
               node    <- arbitrary[Node].map(_.withId(stubCert.keyHash))
-              n       <- Gen.choose(0, deploys.size)
-            } yield (deploys, node, n)
+              k       <- Gen.choose(0, deploys.size)
+            } yield (deploys, node, k)
 
             forAll(genTestCase) {
-              case (deploys, node, n) =>
+              case (deploys, node, k) =>
                 runTestUnsafe(TestData(deploys = deploys)) {
                   val req = NewDeploysRequest()
                     .withSender(node)
-                    .withDeployHashes(deploys.takeRight(n).map(_.deployHash))
+                    .withDeployHashes(deploys.takeRight(k).map(_.deployHash))
 
                   // If `newDeploy` called any of the default empty mock classes they would throw.
                   stub.newDeploys(req) map { res =>
@@ -1575,10 +1584,13 @@ object GrpcGossipServiceSpec extends TestRuntime with ArbitraryConsensusAndComm 
       new GossipServiceServer.Backend[Task] {
         def getDeploySummary(deployHash: ByteString): Task[Option[DeploySummary]] =
           Task.delay(testDataRef.get.deploySummaries.get(deployHash))
+
         def hasDeploy(deployHash: ByteString): Task[Boolean] =
           Task.delay(testDataRef.get.deploys.contains(deployHash))
+
         def hasBlock(blockHash: ByteString) =
           Task.delay(testDataRef.get.blocks.contains(blockHash))
+
         def getBlock(blockHash: ByteString, excludeDeployBodies: Boolean) =
           Task.delay(testDataRef.get.blocks.get(blockHash).map { block =>
             if (excludeDeployBodies) {
@@ -1587,8 +1599,10 @@ object GrpcGossipServiceSpec extends TestRuntime with ArbitraryConsensusAndComm 
               block
             }
           })
+
         def getBlockSummary(blockHash: ByteString) =
           Task.delay(testDataRef.get.blockSummaries.get(blockHash))
+
         def getDeploys(deployHashes: Set[ByteString]) = {
           val deploys = testDataRef.get.blocks.values.flatMap { b =>
             b.getBody.deploys.map(_.getDeploy).filter(d => deployHashes(d.deployHash))
@@ -1658,7 +1672,8 @@ object GrpcGossipServiceSpec extends TestRuntime with ArbitraryConsensusAndComm 
               blockDownloadManager = blockDownloadManager,
               genesisApprover = genesisApprover,
               maxChunkSize = DefaultMaxChunkSize,
-              maxParallelBlockDownloads = maxParallelBlockDownloads
+              maxParallelBlockDownloads = maxParallelBlockDownloads,
+              deployGossipEnabled = true
             ) map { gss =>
               val svc = GrpcGossipService
                 .fromGossipService(gss, rateLimiter, chainId, blockChunkConsumerTimeout)

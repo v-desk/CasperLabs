@@ -3,9 +3,10 @@ use std::{convert::TryFrom, rc::Rc};
 use engine_core::engine_state::{execution_result::ExecutionResult, CONV_RATE};
 use engine_shared::motes::Motes;
 use engine_test_support::internal::{
-    utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder as TestBuilder, DEFAULT_GENESIS_CONFIG,
+    utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder as TestBuilder,
+    DEFAULT_RUN_GENESIS_REQUEST,
 };
-use types::{account::PublicKey, bytesrepr::ToBytes, CLValue, Key, U512};
+use types::{account::PublicKey, bytesrepr::ToBytes, ApiError, CLValue, Key, U512};
 
 const ERC_20_CONTRACT_WASM: &str = "erc20_smart_contract.wasm";
 const TRANFER_TO_ACCOUNT_WASM: &str = "transfer_to_account_u512.wasm";
@@ -31,7 +32,7 @@ pub struct ERC20Test {
 impl ERC20Test {
     pub fn new(sender: PublicKey, init_balance: U512) -> ERC20Test {
         let mut builder = TestBuilder::default();
-        builder.run_genesis(&DEFAULT_GENESIS_CONFIG).commit();
+        builder.run_genesis(&DEFAULT_RUN_GENESIS_REQUEST).commit();
         let test = ERC20Test {
             builder,
             token_hash: None,
@@ -226,7 +227,7 @@ impl ERC20Test {
             .builder
             .exec_error_message(last_deploy_index - 1)
             .unwrap();
-        let expected_message = format!("Revert({:?})", code);
+        let expected_message = format!("{:?}", ApiError::from(code));
         assert!(deploy_error.contains(&expected_message));
         self
     }

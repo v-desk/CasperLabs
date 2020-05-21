@@ -24,10 +24,10 @@ impl SystemContractCache {
     /// If the cache did not have this key present, `None` is returned.
     ///
     /// If the cache did have this key present, the value is updated, and the old value is returned.
-    pub fn insert(&self, uref: URef, contract: Module) -> Option<Module> {
+    pub fn insert(&self, uref: URef, module: Module) -> Option<Module> {
         let mut guarded_map = self.0.write().unwrap();
         let uref = uref.remove_access_rights();
-        guarded_map.insert(uref, contract)
+        guarded_map.insert(uref, module)
     }
 
     /// Returns a clone of the contract corresponding to `uref`.
@@ -43,14 +43,13 @@ mod tests {
     use std::sync::Mutex;
 
     use lazy_static::lazy_static;
-    use parity_wasm::elements::{Module, ModuleNameSection, NameSection, Section};
-
-    use types::{AccessRights, URef};
+    use parity_wasm::elements::{Module, ModuleNameSubsection, NameSection, Section};
 
     use crate::{
         engine_state::system_contract_cache::SystemContractCache,
         execution::{AddressGenerator, AddressGeneratorBuilder},
     };
+    use types::{AccessRights, URef};
 
     lazy_static! {
         static ref ADDRESS_GENERATOR: Mutex<AddressGenerator> = Mutex::new(
@@ -222,7 +221,7 @@ mod tests {
         };
         let initial_module = Module::default();
         let updated_module = {
-            let section = NameSection::Module(ModuleNameSection::new("a_mod"));
+            let section = NameSection::new(Some(ModuleNameSubsection::new("a_mod")), None, None);
             let sections = vec![Section::Name(section)];
             Module::new(sections)
         };
@@ -252,7 +251,7 @@ mod tests {
         };
         let initial_module = Module::default();
         let updated_module = {
-            let section = NameSection::Module(ModuleNameSection::new("a_mod"));
+            let section = NameSection::new(Some(ModuleNameSubsection::new("a_mod")), None, None);
             let sections = vec![Section::Name(section)];
             Module::new(sections)
         };

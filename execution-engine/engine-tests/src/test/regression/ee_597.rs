@@ -1,5 +1,7 @@
 use engine_test_support::{
-    internal::{utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_GENESIS_CONFIG},
+    internal::{
+        utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_RUN_GENESIS_REQUEST,
+    },
     DEFAULT_ACCOUNT_ADDR,
 };
 use types::ApiError;
@@ -14,7 +16,7 @@ fn should_fail_when_bonding_amount_is_zero_ee_597_regression() {
             .build();
 
     let result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request)
         .commit()
         .finish();
@@ -28,11 +30,9 @@ fn should_fail_when_bonding_amount_is_zero_ee_597_regression() {
     let error_message = utils::get_error_message(response);
 
     if !cfg!(feature = "enable-bonding") {
-        assert!(error_message.contains(&format!("Revert({})", u32::from(ApiError::Unhandled))));
+        assert!(error_message.contains(&format!("{:?}", ApiError::Unhandled)));
     } else {
         // Error::BondTooSmall => 5,
-        assert!(
-            error_message.contains(&format!("Revert({})", u32::from(ApiError::ProofOfStake(5))))
-        );
+        assert!(error_message.contains(&format!("{:?}", ApiError::ProofOfStake(5))));
     }
 }

@@ -58,10 +58,10 @@ fn should_run_successful_bond_and_unbond() {
         tmp
     };
 
-    let genesis_config = utils::create_genesis_config(accounts);
+    let run_genesis_request = utils::create_run_genesis_request(accounts);
 
     let mut builder = InMemoryWasmTestBuilder::default();
-    let result = builder.run_genesis(&genesis_config).finish();
+    let result = builder.run_genesis(&run_genesis_request).finish();
 
     let default_account = builder
         .get_account(DEFAULT_ACCOUNT_ADDR)
@@ -432,7 +432,7 @@ fn should_fail_bonding_with_insufficient_funds() {
         tmp
     };
 
-    let genesis_config = utils::create_genesis_config(accounts);
+    let run_genesis_request = utils::create_run_genesis_request(accounts);
 
     let exec_request_1 = ExecuteRequestBuilder::standard(
         DEFAULT_ACCOUNT_ADDR,
@@ -455,7 +455,7 @@ fn should_fail_bonding_with_insufficient_funds() {
     .build();
 
     let result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&genesis_config)
+        .run_genesis(&run_genesis_request)
         .exec(exec_request_1)
         .commit()
         .exec(exec_request_2)
@@ -471,12 +471,10 @@ fn should_fail_bonding_with_insufficient_funds() {
     let error_message = utils::get_error_message(response);
 
     if !cfg!(feature = "enable-bonding") {
-        assert!(error_message.contains(&format!("Revert({})", u32::from(ApiError::Unhandled))));
+        assert!(error_message.contains(&format!("{:?}", ApiError::Unhandled)));
     } else {
         // pos::Error::BondTransferFailed => 8
-        assert!(
-            error_message.contains(&format!("Revert({})", u32::from(ApiError::ProofOfStake(8))))
-        );
+        assert!(error_message.contains(&format!("{:?}", ApiError::ProofOfStake(8))));
     }
 }
 
@@ -494,7 +492,7 @@ fn should_fail_unbonding_validator_without_bonding_first() {
         tmp
     };
 
-    let genesis_config = utils::create_genesis_config(accounts);
+    let run_genesis_request = utils::create_run_genesis_request(accounts);
 
     let exec_request = ExecuteRequestBuilder::standard(
         DEFAULT_ACCOUNT_ADDR,
@@ -504,7 +502,7 @@ fn should_fail_unbonding_validator_without_bonding_first() {
     .build();
 
     let result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&genesis_config)
+        .run_genesis(&run_genesis_request)
         .exec(exec_request)
         .commit()
         .finish();
@@ -518,11 +516,9 @@ fn should_fail_unbonding_validator_without_bonding_first() {
     let error_message = utils::get_error_message(response);
 
     if !cfg!(feature = "enable-bonding") {
-        assert!(error_message.contains(&format!("Revert({})", u32::from(ApiError::Unhandled))));
+        assert!(error_message.contains(&format!("{:?}", ApiError::Unhandled)));
     } else {
         // pos::Error::NotBonded => 0
-        assert!(
-            error_message.contains(&format!("Revert({})", u32::from(ApiError::ProofOfStake(0))))
-        );
+        assert!(error_message.contains(&format!("{:?}", ApiError::ProofOfStake(0))));
     }
 }

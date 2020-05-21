@@ -8,7 +8,9 @@ use lazy_static::lazy_static;
 
 use engine_core::engine_state::{
     execution_result::ExecutionResult,
-    genesis::{GenesisAccount, GenesisConfig},
+    genesis::{ExecConfig, GenesisAccount, GenesisConfig},
+    run_genesis_request::RunGenesisRequest,
+    Error,
 };
 use engine_shared::{
     account::Account, additive_map::AdditiveMap, gas::Gas, stored_value::StoredValue,
@@ -17,8 +19,9 @@ use engine_shared::{
 use types::Key;
 
 use crate::internal::{
-    DEFAULT_CHAIN_NAME, DEFAULT_GENESIS_TIMESTAMP, DEFAULT_PROTOCOL_VERSION, DEFAULT_WASM_COSTS,
-    MINT_INSTALL_CONTRACT, POS_INSTALL_CONTRACT, STANDARD_PAYMENT_INSTALL_CONTRACT,
+    DEFAULT_CHAIN_NAME, DEFAULT_GENESIS_CONFIG_HASH, DEFAULT_GENESIS_TIMESTAMP,
+    DEFAULT_PROTOCOL_VERSION, DEFAULT_WASM_COSTS, MINT_INSTALL_CONTRACT, POS_INSTALL_CONTRACT,
+    STANDARD_PAYMENT_INSTALL_CONTRACT,
 };
 
 lazy_static! {
@@ -101,23 +104,35 @@ pub fn read_wasm_file_bytes<T: AsRef<Path>>(contract_file: T) -> Vec<u8> {
     panic!("{}\n", error_msg);
 }
 
-pub fn create_genesis_config(accounts: Vec<GenesisAccount>) -> GenesisConfig {
-    let name = DEFAULT_CHAIN_NAME.to_string();
-    let timestamp = DEFAULT_GENESIS_TIMESTAMP;
+pub fn create_exec_config(accounts: Vec<GenesisAccount>) -> ExecConfig {
     let mint_installer_bytes = read_wasm_file_bytes(MINT_INSTALL_CONTRACT);
     let proof_of_stake_installer_bytes = read_wasm_file_bytes(POS_INSTALL_CONTRACT);
     let standard_payment_installer_bytes = read_wasm_file_bytes(STANDARD_PAYMENT_INSTALL_CONTRACT);
-    let protocol_version = *DEFAULT_PROTOCOL_VERSION;
     let wasm_costs = *DEFAULT_WASM_COSTS;
-    GenesisConfig::new(
-        name,
-        timestamp,
-        protocol_version,
+    ExecConfig::new(
         mint_installer_bytes,
         proof_of_stake_installer_bytes,
         standard_payment_installer_bytes,
         accounts,
         wasm_costs,
+    )
+}
+
+pub fn create_genesis_config(accounts: Vec<GenesisAccount>) -> GenesisConfig {
+    let name = DEFAULT_CHAIN_NAME.to_string();
+    let timestamp = DEFAULT_GENESIS_TIMESTAMP;
+    let protocol_version = *DEFAULT_PROTOCOL_VERSION;
+    let exec_config = create_exec_config(accounts);
+
+    GenesisConfig::new(name, timestamp, protocol_version, exec_config)
+}
+
+pub fn create_run_genesis_request(accounts: Vec<GenesisAccount>) -> RunGenesisRequest {
+    let exec_config = create_exec_config(accounts);
+    RunGenesisRequest::new(
+        *DEFAULT_GENESIS_CONFIG_HASH,
+        *DEFAULT_PROTOCOL_VERSION,
+        exec_config,
     )
 }
 
@@ -134,13 +149,13 @@ pub fn get_success_result(response: &[Rc<ExecutionResult>]) -> &ExecutionResult 
     &*response.get(0).expect("should have a result")
 }
 
-pub fn get_precondition_failure(response: &[Rc<ExecutionResult>]) -> String {
+pub fn get_precondition_failure(response: &[Rc<ExecutionResult>]) -> &Error {
     let result = response.get(0).expect("should have a result");
     assert!(
         result.has_precondition_failure(),
         "should be a precondition failure"
     );
-    format!("{}", result.error().expect("should have an error"))
+    result.as_error().expect("should have an error")
 }
 
 pub fn get_error_message<T: AsRef<ExecutionResult>, I: IntoIterator<Item = T>>(

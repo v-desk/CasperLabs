@@ -1,7 +1,10 @@
+use assert_matches::assert_matches;
+
+use engine_core::engine_state::Error;
 use engine_test_support::{
     internal::{
         utils, DeployItemBuilder, ExecuteRequestBuilder, InMemoryWasmTestBuilder,
-        DEFAULT_GENESIS_CONFIG, STANDARD_PAYMENT_CONTRACT,
+        DEFAULT_RUN_GENESIS_REQUEST, STANDARD_PAYMENT_CONTRACT,
     },
     DEFAULT_ACCOUNT_ADDR,
 };
@@ -34,7 +37,7 @@ fn should_raise_precondition_authorization_failure_invalid_account() {
     };
 
     let transfer_result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request)
         .finish();
 
@@ -44,11 +47,7 @@ fn should_raise_precondition_authorization_failure_invalid_account() {
         .expect("there should be a response");
 
     let precondition_failure = utils::get_precondition_failure(response);
-
-    assert_eq!(
-        precondition_failure, "Authorization failure: not authorized.",
-        "expected authorization failure"
-    );
+    assert_matches!(precondition_failure, Error::Authorization);
 }
 
 #[ignore]
@@ -69,7 +68,7 @@ fn should_raise_precondition_authorization_failure_empty_authorized_keys() {
     };
 
     let transfer_result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request)
         .finish();
 
@@ -79,11 +78,7 @@ fn should_raise_precondition_authorization_failure_empty_authorized_keys() {
         .expect("there should be a response");
 
     let precondition_failure = utils::get_precondition_failure(response);
-
-    assert_eq!(
-        precondition_failure, "Authorization failure: not authorized.",
-        "expected authorization failure"
-    );
+    assert_matches!(precondition_failure, Error::Authorization);
 }
 
 #[ignore]
@@ -111,7 +106,7 @@ fn should_raise_precondition_authorization_failure_invalid_authorized_keys() {
     };
 
     let transfer_result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request)
         .finish();
 
@@ -121,9 +116,5 @@ fn should_raise_precondition_authorization_failure_invalid_authorized_keys() {
         .expect("there should be a response");
 
     let precondition_failure = utils::get_precondition_failure(response);
-
-    assert_eq!(
-        precondition_failure, "Authorization failure: not authorized.",
-        "expected authorization failure"
-    );
+    assert_matches!(precondition_failure, Error::Authorization);
 }

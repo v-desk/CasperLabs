@@ -1,10 +1,12 @@
+use assert_matches::assert_matches;
 use lazy_static::lazy_static;
 
-use engine_core::execution;
+use engine_core::{engine_state::Error, execution};
 use engine_shared::TypeMismatch;
 use engine_test_support::{
     internal::{
-        ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_GENESIS_CONFIG, DEFAULT_PAYMENT,
+        ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_PAYMENT,
+        DEFAULT_RUN_GENESIS_REQUEST,
     },
     DEFAULT_ACCOUNT_ADDR,
 };
@@ -42,7 +44,7 @@ fn should_verify_system_contracts_access_rights_default() {
     .build();
 
     builder
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request_1)
         .expect_success()
         .commit();
@@ -55,18 +57,17 @@ fn overwrite_as_account(builder: &mut InMemoryWasmTestBuilder, uref: URef, addre
     let exec_request =
         ExecuteRequestBuilder::standard(address, CONTRACT_OVERWRITE_UREF_CONTENT, (uref,)).build();
 
-    let result = builder.exec(exec_request).commit().finish();
+    builder.exec(exec_request).commit();
 
-    let error_msg = result
-        .builder()
-        .exec_error_message(0)
-        .expect("should execute with error");
-
-    let err = format!(
-        "{}",
-        execution::Error::ForgedReference(uref.into_read_add_write())
-    );
-    assert!(error_msg.contains(&err), "error_msg: {:?}", error_msg);
+    let response = builder
+        .get_exec_responses()
+        .last()
+        .expect("should have last response");
+    assert_eq!(response.len(), 1);
+    let exec_response = response.last().expect("should have response");
+    let error = exec_response.as_error().expect("should have error");
+    let forged_uref = assert_matches!(error, Error::Exec(execution::Error::ForgedReference(forged_uref)) => forged_uref);
+    assert_eq!(forged_uref, &uref.into_read_add_write());
 }
 
 #[ignore]
@@ -81,7 +82,7 @@ fn should_not_overwrite_system_contract_uref_as_user() {
     )
     .build();
 
-    builder.run_genesis(&DEFAULT_GENESIS_CONFIG);
+    builder.run_genesis(&DEFAULT_RUN_GENESIS_REQUEST);
 
     let mint_uref = builder.get_pos_contract_uref().into_read();
     let pos_uref = builder.get_pos_contract_uref().into_read();
@@ -113,7 +114,7 @@ fn should_overwrite_system_contract_uref_as_system() {
     .build();
 
     let result = InMemoryWasmTestBuilder::default()
-        .run_genesis(&DEFAULT_GENESIS_CONFIG)
+        .run_genesis(&DEFAULT_RUN_GENESIS_REQUEST)
         .exec(exec_request_1)
         .expect_success()
         .commit()
@@ -146,12 +147,18 @@ fn should_overwrite_system_contract_uref_as_system() {
 
     let result_pos = new_builder.exec(exec_request_3).commit().finish();
 
-    let error_msg = result_pos
+    let error = result_pos
         .builder()
-        .exec_error_message(0)
-        .expect("should execute pos overwrite with error");
+        .get_exec_response(0)
+        .expect("should execute pos overwrite with error")
+        .last()
+        .expect("should have last execution")
+        .as_error()
+        .expect("should be error");
 
-    let type_mismatch = TypeMismatch::new("Contract".to_string(), "String".to_string());
-    let expected_error = execution::Error::TypeMismatch(type_mismatch);
-    assert!(error_msg.contains(&expected_error.to_string()));
+    let type_mismatch = assert_matches!(error, Error::Exec(execution::Error::TypeMismatch(type_mismatch)) => type_mismatch);
+    assert_eq!(
+        type_mismatch,
+        &TypeMismatch::new("Contract".to_string(), "String".to_string())
+    );
 }
