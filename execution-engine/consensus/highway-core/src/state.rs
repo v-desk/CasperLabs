@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Mul};
+use std::{collections::HashMap, iter, ops::Mul};
 
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use displaydoc::Display;
@@ -119,6 +119,20 @@ impl<C: Context> State<C> {
         self.opt_block(hash).unwrap()
     }
 
+    /// Returns the list of validator weights.
+    pub fn weights(&self) -> &[Weight] {
+        &self.weights
+    }
+
+    pub fn weight(&self, idx: ValidatorIndex) -> Weight {
+        self.weights[idx.0 as usize]
+    }
+
+    /// Returns the complete protocol state's latest panorama.
+    pub fn panorama(&self) -> &Panorama<C> {
+        &self.panorama
+    }
+
     /// Adds the vote to the protocol state, or returns an error if it is invalid.
     /// Panics if dependencies are not satisfied.
     pub fn add_vote(&mut self, wvote: WireVote<C>) -> Result<(), AddVoteError<C>> {
@@ -161,8 +175,55 @@ impl<C: Context> State<C> {
         panorama.enumerate().filter_map(missing_dep).next()
     }
 
+    /// Returns the fork choice from `pan`'s view, or `None` if there are no blocks yet.
+    ///
+    /// The correct validators' latest votes count as votes for the block they point to, as well as
+    /// all of its ancestors. At each level the block with the highest score is selected from the
+    /// children of the previously selected block (or from all blocks at height 0), until a block
+    /// is reached that has no children with any votes.
+    pub fn fork_choice<'a>(&'a self, pan: &Panorama<C>) -> Option<&'a C::VoteHash> {
+        // Collect all correct votes in a `Tallies` map, sorted by height.
+        let to_entry = |(obs, w): (&Observation<C>, &Weight)| {
+            let bhash = &self.vote(obs.correct()?).block;
+            Some((self.block(bhash).height, bhash, *w))
+        };
+        let mut tallies: Tallies<C> = pan.iter().zip(&self.weights).filter_map(to_entry).collect();
+        loop {
+            // Find the highest block that we know is an ancestor of the fork choice.
+            let (height, bhash) = tallies.find_decided(self)?;
+            // Drop all votes that are not descendants of `bhash`.
+            tallies = tallies.filter_descendants(height, bhash, self);
+            // If there are no blocks left, `bhash` itself is the fork choice. Otherwise repeat.
+            if tallies.is_empty() {
+                return Some(bhash);
+            }
+        }
+    }
+
+    /// Returns the ancestor of the block with the given `hash`, on the specified `height`, or
+    /// `None` if the block's height is lower than that.
+    pub fn find_ancestor<'a>(
+        &'a self,
+        hash: &'a C::VoteHash,
+        height: u64,
+    ) -> Option<&'a C::VoteHash> {
+        let block = self.block(hash);
+        if block.height < height {
+            return None;
+        }
+        if block.height == height {
+            return Some(hash);
+        }
+        let diff = block.height - height;
+        // We want to make the greatest step 2^i such that 2^i <= diff.
+        let max_i = log2(diff) as usize;
+        let i = max_i.min(block.skip_idx.len() - 1);
+        self.find_ancestor(&block.skip_idx[i], height)
+    }
+
     /// Returns an error if `wvote` is invalid.
     fn validate_vote(&self, wvote: &WireVote<C>) -> Result<(), VoteError> {
+        // TODO: Timestamps
         let sender = wvote.sender;
         // Check that the panorama is consistent.
         if (wvote.values.is_none() && wvote.panorama.is_empty())
@@ -205,31 +266,6 @@ impl<C: Context> State<C> {
         self.panorama.update(wvote.sender, new_obs);
     }
 
-    /// Returns the fork choice from `pan`'s view, or `None` if there are no blocks yet.
-    ///
-    /// The correct validators' latest votes count as votes for the block they point to, as well as
-    /// all of its ancestors. At each level the block with the highest score is selected from the
-    /// children of the previously selected block (or from all blocks at height 0), until a block
-    /// is reached that has no children with any votes.
-    fn fork_choice<'a>(&'a self, pan: &Panorama<C>) -> Option<&'a C::VoteHash> {
-        // Collect all correct votes in a `Tallies` map, sorted by height.
-        let to_entry = |(obs, w): (&Observation<C>, &Weight)| {
-            let bhash = &self.vote(obs.correct()?).block;
-            Some((self.block(bhash).height, bhash, *w))
-        };
-        let mut tallies: Tallies<C> = pan.iter().zip(&self.weights).filter_map(to_entry).collect();
-        loop {
-            // Find the highest block that we know is an ancestor of the fork choice.
-            let (height, bhash) = tallies.find_decided(self)?;
-            // Drop all votes that are not descendants of `bhash`.
-            tallies = tallies.filter_descendants(height, bhash, self);
-            // If there are no blocks left, `bhash` itself is the fork choice. Otherwise repeat.
-            if tallies.is_empty() {
-                return Some(bhash);
-            }
-        }
-    }
-
     /// Returns the hash of the message with the given sequence number from the sender of `hash`.
     /// Panics if the sequence number is higher than that of the vote with `hash`.
     fn find_in_swimlane<'a>(&'a self, hash: &'a C::VoteHash, seq_number: u64) -> &'a C::VoteHash {
@@ -245,25 +281,19 @@ impl<C: Context> State<C> {
         self.find_in_swimlane(&vote.skip_idx[i], seq_number)
     }
 
-    /// Returns the ancestor of the block with the given `hash`, on the specified `height`, or
-    /// `None` if the block's height is lower than that.
-    pub fn find_ancestor<'a>(
+    /// Returns an iterator over votes (with hashes) by the same sender, in reverse chronological
+    /// order, starting with the specified vote.
+    pub fn swimlane<'a>(
         &'a self,
-        hash: &'a C::VoteHash,
-        height: u64,
-    ) -> Option<&'a C::VoteHash> {
-        let block = self.block(hash);
-        if block.height < height {
-            return None;
-        }
-        if block.height == height {
-            return Some(hash);
-        }
-        let diff = block.height - height;
-        // We want to make the greatest step 2^i such that 2^i <= diff.
-        let max_i = log2(diff) as usize;
-        let i = max_i.min(block.skip_idx.len() - 1);
-        self.find_ancestor(&block.skip_idx[i], height)
+        vhash: &'a C::VoteHash,
+    ) -> impl Iterator<Item = (&'a C::VoteHash, &'a Vote<C>)> {
+        let mut next = Some(vhash);
+        iter::from_fn(move || {
+            let current = next?;
+            let vote = self.vote(current);
+            next = vote.previous();
+            Some((current, vote))
+        })
     }
 
     /// Returns `pan` is valid, i.e. it contains the latest votes of some substate of `self`.
