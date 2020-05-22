@@ -3,11 +3,10 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     mem,
-    ops::{Deref, DerefMut},
 };
 
+use derive_more::{Deref, DerefMut};
 use pothole::{Block, BlockIndex, Pothole, PotholeResult};
-
 use synchronizer::{
     DependencySpec, HandleNewItemResult, ItemWithId, NodeId, ProtocolState, Synchronizer,
     SynchronizerMessage,
@@ -20,9 +19,11 @@ pub enum PotholeMessage<B> {
     NewBlock(BlockIndex, B),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deref, DerefMut)]
 pub struct PotholeWrapper<B: Block> {
     finalized_block_queue: VecDeque<(BlockIndex, B)>,
+    #[deref]
+    #[deref_mut]
     pothole: Pothole<B>,
 }
 
@@ -36,20 +37,6 @@ impl<B: Block> PotholeWrapper<B> {
 
     pub fn poll(&mut self) -> Option<(BlockIndex, B)> {
         self.finalized_block_queue.pop_front()
-    }
-}
-
-impl<B: Block> Deref for PotholeWrapper<B> {
-    type Target = Pothole<B>;
-
-    fn deref(&self) -> &Pothole<B> {
-        &self.pothole
-    }
-}
-
-impl<B: Block> DerefMut for PotholeWrapper<B> {
-    fn deref_mut(&mut self) -> &mut Pothole<B> {
-        &mut self.pothole
     }
 }
 

@@ -11,6 +11,7 @@ license-file = "../LICENSE"
 
 [dependencies]
 anyhow = "1.0.28"
+derive_more = "0.99"
 highway = { path = "../highway-core", version = "0.1.0", package = "highway-core" }
 pothole = { path = "../pothole", version = "0.1.0", package = "pothole" }
 synchronizer = { path = "../synchronizer", version = "0.1.0", package = "synchronizer" }
