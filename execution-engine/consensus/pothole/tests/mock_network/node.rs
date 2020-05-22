@@ -102,7 +102,13 @@ impl Node {
                 vec![]
             }
             NetworkMessage::NewFinalizedBlock(index, block) => {
-                self.pothole.handle_new_block(index, block)
+                match self.pothole.handle_new_block(index, block) {
+                    Ok(msgs) => msgs,
+                    Err(next_index) => panic!(
+                        "{} should've received index {:?}, got {:?}",
+                        self.our_id, next_index, index
+                    ),
+                }
             }
         }
     }
