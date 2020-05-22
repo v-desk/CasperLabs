@@ -115,11 +115,8 @@ impl<B: Block + Hash + Eq> ProtocolState for PotholeWrapper<B> {
         match self.pothole.handle_new_block(item_id, item) {
             Ok(messages) => {
                 for message in messages {
-                    match message {
-                        PotholeResult::FinalizedBlock(index, block) => {
-                            self.finalized_block_queue.push_back((index, block));
-                        }
-                        _ => (),
+                    if let PotholeResult::FinalizedBlock(index, block) = message {
+                        self.finalized_block_queue.push_back((index, block));
                     }
                 }
                 HandleNewItemResult::Accepted
@@ -154,6 +151,18 @@ impl<N: NodeId, B: Block + Hash + Eq> PotholeWithSynchronizer<N, B> {
     }
 }
 
+fn into_consenus_result<N: NodeId, B: Block + Hash + Eq>(
+    pothole_result: PotholeResult<B>,
+) -> Option<ConsensusProtocolResult<PotholeContext<N, B>>> {
+    match pothole_result {
+        PotholeResult::ScheduleTimer(timer_id, instant) => Some(
+            ConsensusProtocolResult::ScheduleTimer(instant, TimerId(timer_id)),
+        ),
+        PotholeResult::CreateNewBlock => Some(ConsensusProtocolResult::CreateNewBlock),
+        _ => None,
+    }
+}
+
 impl<N: NodeId, B: Block + Hash + Eq> ConsensusProtocol<PotholeContext<N, B>>
     for PotholeWithSynchronizer<N, B>
 {
@@ -178,16 +187,7 @@ impl<N: NodeId, B: Block + Hash + Eq> ConsensusProtocol<PotholeContext<N, B>>
             .pothole
             .handle_timer(timer_id.0)
             .into_iter()
-            .filter_map(|pothole_result| match pothole_result {
-                PotholeResult::ScheduleTimer(timer_id, instant) => Some(ConsensusProtocolResult::<
-                    PotholeContext<N, B>,
-                >::ScheduleTimer(
-                    instant,
-                    TimerId(timer_id),
-                )),
-                // TODO: handle requests for new blocks!
-                _ => None,
-            })
+            .filter_map(into_consenus_result)
             .collect())
     }
 }

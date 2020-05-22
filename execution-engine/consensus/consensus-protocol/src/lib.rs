@@ -36,6 +36,7 @@ pub enum ConsensusProtocolResult<Ctx: ConsensusContext> {
     CreatedNewMessage(Ctx::Message),
     InvalidIncomingMessage(Ctx::Message, anyhow::Error),
     ScheduleTimer(Instant, TimerId),
+    CreateNewBlock,
 }
 
 /// An API for a single instance of the consensus.
