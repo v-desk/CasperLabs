@@ -8,7 +8,7 @@ use crate::{
 };
 
 struct Section<'a, C: Context> {
-    seq_nrs: BTreeMap<ValidatorIndex, u64>,
+    sequence_numbers: BTreeMap<ValidatorIndex, u64>,
     state: &'a State<C>,
 }
 
@@ -27,7 +27,7 @@ impl<'a, C: Context> Section<'a, C> {
         };
         let correct_votes = state.panorama().enumerate_correct();
         Section {
-            seq_nrs: correct_votes.filter_map(to_lvl0vote).collect(),
+            sequence_numbers: correct_votes.filter_map(to_lvl0vote).collect(),
             state,
         }
     }
@@ -47,7 +47,7 @@ impl<'a, C: Context> Section<'a, C> {
     /// by the committee in `self`.
     fn pruned_committee(&self, quorum: Weight) -> Vec<ValidatorIndex> {
         let mut committee: Vec<ValidatorIndex> = Vec::new();
-        let mut next_comm: Vec<ValidatorIndex> = self.seq_nrs.keys().cloned().collect();
+        let mut next_comm: Vec<ValidatorIndex> = self.sequence_numbers.keys().cloned().collect();
         while next_comm.len() != committee.len() {
             committee = next_comm;
             let sees_quorum = |&idx: &ValidatorIndex| {
@@ -72,7 +72,7 @@ impl<'a, C: Context> Section<'a, C> {
             (idx, vote.seq_number)
         };
         Section {
-            seq_nrs: committee.iter().map(find_first_lvl_n).collect(),
+            sequence_numbers: committee.iter().map(find_first_lvl_n).collect(),
             state: self.state,
         }
     }
@@ -88,7 +88,7 @@ impl<'a, C: Context> Section<'a, C> {
 
     /// Returns whether `pan` can see `idx`'s vote in `self`.
     fn can_see(&self, pan: &Panorama<C>, idx: ValidatorIndex) -> bool {
-        match (pan.get(idx).correct(), self.seq_nrs.get(&idx)) {
+        match (pan.get(idx).correct(), self.sequence_numbers.get(&idx)) {
             (Some(vhash), Some(self_sn)) => self.state.vote(vhash).seq_number >= *self_sn,
             (_, _) => false,
         }
