@@ -2,9 +2,9 @@ use std::{collections::BTreeMap, iter};
 
 use crate::{
     state::{State, Weight},
-    traits::Context,
+    traits::{ConsensusValueT, Context},
     validators::ValidatorIndex,
-    vote::{Panorama, Vote},
+    vote::{Observation, Panorama, Vote},
 };
 
 /// A list containing the earliest level-n messages of each member of some committee, for some n.
@@ -125,35 +125,58 @@ pub struct FinalityDetector<C: Context> {
 }
 
 impl<C: Context> FinalityDetector<C> {
+    pub fn new(ftt: Weight) -> Self {
+        FinalityDetector {
+            last_finalized: None,
+            ftt,
+        }
+    }
+
     /// Returns the next batch of values, if any has been finalized since the last call.
     // TODO: Iterate this and return multiple finalized blocks.
     // TODO: Verify the consensus instance ID?
-    pub fn run(&mut self, state: &State<C>) -> Option<Vec<C::ConsensusValue>> {
-        let candidate = self.next_candidate(state)?;
+    pub fn run(&mut self, state: &State<C>) -> FinalityResult<C::ConsensusValue> {
         let total_w: Weight = state.weights().iter().cloned().sum();
-        let mut target_lvl = 64; // Levels higher than 64 can't have an effect on a u64 FTT.
-        while target_lvl > 0 {
-            let lvl = self.find_summit(target_lvl, total_w, candidate, state);
-            if lvl == target_lvl {
-                self.last_finalized = Some(candidate.clone());
-                return Some(state.block(candidate).values.clone());
-            }
-            target_lvl = lvl;
+        let fault_w: Weight = state
+            .panorama()
+            .iter()
+            .zip(state.weights())
+            .filter(|(obs, _)| **obs == Observation::Faulty)
+            .map(|(_, w)| *w)
+            .sum();
+        if fault_w >= self.ftt {
+            return FinalityResult::FttExceeded;
         }
-        None
+        if let Some(candidate) = self.next_candidate(state) {
+            let mut target_lvl = 64; // Levels higher than 64 can't have an effect on a u64 FTT.
+            while target_lvl > 0 {
+                let lvl = self.find_summit(target_lvl, total_w, fault_w, candidate, state);
+                if lvl == target_lvl {
+                    self.last_finalized = Some(candidate.clone());
+                    return FinalityResult::Finalized(state.block(candidate).values.clone());
+                }
+                target_lvl = lvl;
+            }
+        }
+        FinalityResult::None
     }
 
     /// Returns the number of levels of the highest summit with a quorum that a `target_lvl` summit
     /// would need for the desired FTT. If the returned number is `target_lvl` that means the
     /// `candidate` is finalized. If not, we need to retry with a lower `target_lvl`.
+    ///
+    /// The faulty validators are considered to be part of any summit, for consistency: That way,
+    /// running the finality detector with the same FTT on a later state always returns at least as
+    /// many values as on the earlier state, as long as the FTT has not been exceeded.
     fn find_summit(
         &self,
         target_lvl: usize,
         total_w: Weight,
+        fault_w: Weight,
         candidate: &C::VoteHash,
         state: &State<C>,
     ) -> usize {
-        let quorum = self.quorum_for_lvl(target_lvl, total_w);
+        let quorum = self.quorum_for_lvl(target_lvl, total_w) - fault_w;
         let sec0 = Section::level0(candidate, &state);
         let sections_iter = iter::successors(Some(sec0), |sec| sec.next(quorum));
         sections_iter.take(target_lvl).count()
@@ -161,12 +184,15 @@ impl<C: Context> FinalityDetector<C> {
 
     /// Returns the quorum required by a summit with the specified level and the required FTT.
     fn quorum_for_lvl(&self, lvl: usize, total_w: Weight) -> Weight {
-        // A level-k summit with quorum 50% + t has relative FTT 2t(1 − 1/2^k).
-        // We add 1 before every division to round up.
-        // TODO: Round properly.
-        let ftt128 = self.ftt.0 as u128;
-        let t = (1 + ftt128 * (1u128 << (lvl - 1))) / ((1u128 << lvl) - 1);
-        Weight((1 + total_w.0) / 2 + t as u64)
+        // A level-lvl summit with quorum  total_w/2 + t  has relative FTT  2t(1 − 1/2^lvl). So:
+        // quorum = total_w / 2 + ftt / 2 / (1 - 1/2^lvl)
+        //        = total_w / 2 + 2^lvl * ftt / 2 / (2^lvl - 1)
+        //        = ((2^lvl - 1) total_w + 2^lvl ftt) / (2 * 2^lvl - 2))
+        let pow_lvl = 1u128 << lvl;
+        let numerator = (pow_lvl - 1) * (total_w.0 as u128) + pow_lvl * (self.ftt.0 as u128);
+        let denominator = 2 * pow_lvl - 2;
+        // Since this is a lower bound for the quorum, we round up when dividing.
+        Weight(((numerator + denominator - 1) / denominator) as u64)
     }
 
     /// Returns the next candidate for finalization, i.e. the lowest block in the fork choice that
