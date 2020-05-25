@@ -7,8 +7,13 @@ use crate::{
     vote::{Panorama, Vote},
 };
 
+/// A list containing the earliest level-n messages of each member of some committee, for some n.
+#[derive(Debug)]
 struct Section<'a, C: Context> {
+    /// Assigns to each member of a committee the sequence number of the earliest message that
+    /// qualifies them for that committee.
     sequence_numbers: BTreeMap<ValidatorIndex, u64>,
+    /// A reference to the protocol state this section belongs to.
     state: &'a State<C>,
 }
 
@@ -95,11 +100,23 @@ impl<'a, C: Context> Section<'a, C> {
     }
 }
 
+/// The result of running the finality detector on a protocol state.
+#[derive(Debug, Eq, PartialEq)]
+pub enum FinalityResult<V: ConsensusValueT> {
+    /// No new block has been finalized yet.
+    None,
+    /// A new block with these consensus values has been finalized.
+    Finalized(Vec<V>),
+    /// The fault tolerance threshold has been exceeded: The number of observed equivocation
+    /// invalidates this finality detector's results.
+    FttExceeded,
+}
+
 /// An incremental finality detector.
 ///
 /// It reuses information between subsequent calls, so it must always be applied to the same
 /// `State` instance.
-#[derive(Default)]
+#[derive(Debug)]
 pub struct FinalityDetector<C: Context> {
     /// The most recent known finalized block.
     last_finalized: Option<C::VoteHash>,
