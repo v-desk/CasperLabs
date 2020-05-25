@@ -208,3 +208,52 @@ impl<C: Context> FinalityDetector<C> {
         self.last_finalized.as_ref().map_or(0, height_plus_1)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{tests::*, AddVoteError, State};
+
+    #[test]
+    fn finality_detector() -> Result<(), AddVoteError<TestContext>> {
+        let mut state = State::new(&[Weight(5), Weight(4), Weight(1)]);
+
+        // Create blocks with scores as follows:
+        //
+        //          a0: 9 — a1: 5
+        //        /       \
+        // b0: 10           b1: 4
+        //        \
+        //          c0: 1 — c1: 1
+        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("B0"))?;
+        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).with_value("C0"))?;
+        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).with_value("C1"))?;
+        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).with_value("A0"))?;
+        state.add_vote(vote("a1", ALICE, ["a0", "b0", "c1"]).with_value("A1"))?;
+        state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]).with_value("B1"))?;
+
+        let mut fd4 = FinalityDetector::new(Weight(4)); // Fault tolerance 4.
+        let mut fd6 = FinalityDetector::new(Weight(6)); // Fault tolerance 6.
+
+        // `b0`, `a0` are level 0 for `B0`. `a0`, `b1` are level 1.
+        // So the fault tolerance of `B0` is 2 * (9 - 5) * (1 - 1/2) = 4.
+        assert_eq!(FinalityResult::None, fd6.run(&state));
+        assert_eq!(FinalityResult::Finalized(vec!["B0"]), fd4.run(&state));
+        assert_eq!(FinalityResult::None, fd4.run(&state));
+
+        // Adding another level to the summit increases `B0`'s fault tolerance to 6.
+        state.add_vote(vote("a2", ALICE, ["a1", "b1", "c1"]))?;
+        state.add_vote(vote("b2", BOB, ["a1", "b1", "c1"]))?;
+        assert_eq!(FinalityResult::Finalized(vec!["B0"]), fd6.run(&state));
+        assert_eq!(FinalityResult::None, fd6.run(&state));
+
+        // If Alice equivocates, the FTT 4 is exceeded, but she counts as being part of any summit,
+        // so `A0` and `A1` get FTT 6. (Bob voted for `A1` and against `B1` in `b2`.)
+        state.add_vote(vote("e2", ALICE, ["a1", "b1", "c1"]))?;
+        assert_eq!(FinalityResult::FttExceeded, fd4.run(&state));
+        assert_eq!(FinalityResult::Finalized(vec!["A0"]), fd6.run(&state));
+        assert_eq!(FinalityResult::Finalized(vec!["A1"]), fd6.run(&state));
+        assert_eq!(FinalityResult::None, fd6.run(&state));
+        Ok(())
+    }
+}
