@@ -179,7 +179,7 @@ impl<C: Context> FinalityDetector<C> {
         let quorum = self.quorum_for_lvl(target_lvl, total_w) - fault_w;
         let sec0 = Section::level0(candidate, &state);
         let sections_iter = iter::successors(Some(sec0), |sec| sec.next(quorum));
-        sections_iter.take(target_lvl).count()
+        sections_iter.skip(1).take(target_lvl).count()
     }
 
     /// Returns the quorum required by a summit with the specified level and the required FTT.
