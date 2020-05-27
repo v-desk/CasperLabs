@@ -51,17 +51,18 @@ impl<'a, C: Context> Section<'a, C> {
     /// Returns the greatest committee of validators whose latest votes can see a quorum of votes
     /// by the committee in `self`.
     fn pruned_committee(&self, quorum: Weight) -> Vec<ValidatorIndex> {
-        let mut committee: Vec<ValidatorIndex> = Vec::new();
-        let mut next_comm: Vec<ValidatorIndex> = self.sequence_numbers.keys().cloned().collect();
-        while next_comm.len() != committee.len() {
-            committee = next_comm;
+        let mut committee: Vec<ValidatorIndex> = self.sequence_numbers.keys().cloned().collect();
+        loop {
+            let old_comm = committee;
             let sees_quorum = |&idx: &ValidatorIndex| {
                 let vhash = self.state.panorama().get(idx).correct().unwrap();
-                self.seen_weight(self.state.vote(vhash), &committee) >= quorum
+                self.seen_weight(self.state.vote(vhash), &old_comm) >= quorum
             };
-            next_comm = committee.iter().cloned().filter(sees_quorum).collect();
+            committee = old_comm.iter().cloned().filter(sees_quorum).collect();
+            if committee == old_comm {
+                return committee;
+            }
         }
-        committee
     }
 
     /// Returns the section containing the earliest vote of each of the `committee` members that
