@@ -20,7 +20,7 @@ struct Section<'a, C: Context> {
 impl<'a, C: Context> Section<'a, C> {
     /// Creates a section assigning to each validator their level-0 vote, i.e. the oldest vote in
     /// their current streak of votes for `candidate` (and descendants), or `None` if their latest
-    /// vote is not for `bhash`.
+    /// vote is not for `candidate`.
     fn level0(candidate: &'a C::VoteHash, state: &'a State<C>) -> Self {
         let height = state.block(candidate).height;
         let to_lvl0vote = |(idx, vhash): (ValidatorIndex, &'a C::VoteHash)| {
@@ -155,6 +155,8 @@ impl<C: Context> FinalityDetector<C> {
                     self.last_finalized = Some(candidate.clone());
                     return FinalityResult::Finalized(state.block(candidate).values.clone());
                 }
+                // The required quorum increases with decreasing level, so choosing `target_lvl`
+                // greater than `lvl` would always yield a summit of level `lvl` or lower.
                 target_lvl = lvl;
             }
         }
@@ -235,8 +237,11 @@ mod tests {
         let mut fd4 = FinalityDetector::new(Weight(4)); // Fault tolerance 4.
         let mut fd6 = FinalityDetector::new(Weight(6)); // Fault tolerance 6.
 
+        // The total weight of our validators is 10.
+        // A level-k summit with quorum q has relative FTT  2 (q - 10/2) (1 − 1/2^k).
+        //
         // `b0`, `a0` are level 0 for `B0`. `a0`, `b1` are level 1.
-        // So the fault tolerance of `B0` is 2 * (9 - 5) * (1 - 1/2) = 4.
+        // So the fault tolerance of `B0` is 2 * (9 - 10/2) * (1 - 1/2) = 4.
         assert_eq!(FinalityResult::None, fd6.run(&state));
         assert_eq!(FinalityResult::Finalized(vec!["B0"]), fd4.run(&state));
         assert_eq!(FinalityResult::None, fd4.run(&state));
