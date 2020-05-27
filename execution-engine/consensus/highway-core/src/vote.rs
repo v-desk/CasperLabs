@@ -57,6 +57,12 @@ impl<C: Context> Panorama<C> {
             .map(|(idx, obs)| (ValidatorIndex(idx as u32), obs))
     }
 
+    /// Returns an iterator over all correct latest votes, by validator index.
+    pub fn enumerate_correct(&self) -> impl Iterator<Item = (ValidatorIndex, &C::VoteHash)> {
+        self.enumerate()
+            .filter_map(|(idx, obs)| obs.correct().map(|vhash| (idx, vhash)))
+    }
+
     /// Updates this panorama by adding one vote. Assumes that all justifications of that vote are
     /// already seen.
     pub fn update(&mut self, idx: ValidatorIndex, obs: Observation<C>) {
@@ -116,5 +122,10 @@ impl<C: Context> Vote<C> {
             skip_idx,
         };
         (vote, wvote.values)
+    }
+
+    /// Returns the sender's previous message.
+    pub fn previous(&self) -> Option<&C::VoteHash> {
+        self.skip_idx.first()
     }
 }

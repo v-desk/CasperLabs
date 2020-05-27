@@ -39,7 +39,7 @@ pub struct HighwayParams<C: Context> {
     tick_length: Duration,
 }
 
-/// A passive instance of the Highway protocol, containing its local highway.
+/// A passive instance of the Highway protocol, containing its local state.
 ///
 /// Both observers and active validators must instantiate this, pass in all incoming vertices from
 /// peers, and use a [FinalityDetector](../finality_detector/struct.FinalityDetector.html) to
