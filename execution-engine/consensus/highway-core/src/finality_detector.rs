@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn finality_detector() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(&[Weight(5), Weight(4), Weight(1)]);
+        let mut state = State::new(&[Weight(5), Weight(4), Weight(1)], 0);
 
         // Create blocks with scores as follows:
         //

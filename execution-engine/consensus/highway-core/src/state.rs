@@ -2,6 +2,8 @@ use std::{collections::HashMap, iter, ops::Mul};
 
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use displaydoc::Display;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use thiserror::Error;
 
 use crate::{
@@ -71,16 +73,19 @@ pub struct State<C: Context> {
     evidence: HashMap<ValidatorIndex, Evidence<C>>,
     /// The full panorama, corresponding to the complete protocol state.
     panorama: Panorama<C>,
+    /// The random seed.
+    seed: u64,
 }
 
 impl<C: Context> State<C> {
-    pub fn new(weights: &[Weight]) -> State<C> {
+    pub fn new(weights: &[Weight], seed: u64) -> State<C> {
         State {
             weights: weights.to_vec(),
             votes: HashMap::new(),
             blocks: HashMap::new(),
             evidence: HashMap::new(),
             panorama: Panorama::new(weights.len()),
+            seed,
         }
     }
 
@@ -133,6 +138,12 @@ impl<C: Context> State<C> {
         &self.panorama
     }
 
+    /// Returns the leader in the specified time slot.
+    pub fn leader(&self, instant: u64) -> ValidatorIndex {
+        let mut rng = ChaCha8Rng::seed_from_u64(self.seed.wrapping_add(instant));
+        ValidatorIndex(rng.next_u32())
+    }
+
     /// Adds the vote to the protocol state, or returns an error if it is invalid.
     /// Panics if dependencies are not satisfied.
     pub fn add_vote(&mut self, wvote: WireVote<C>) -> Result<(), AddVoteError<C>> {
@@ -166,6 +177,7 @@ impl<C: Context> State<C> {
             sender: vote.sender,
             values,
             seq_number: vote.seq_number,
+            instant: vote.instant,
         })
     }
 
@@ -223,8 +235,8 @@ impl<C: Context> State<C> {
 
     /// Returns an error if `wvote` is invalid.
     fn validate_vote(&self, wvote: &WireVote<C>) -> Result<(), VoteError> {
-        // TODO: Timestamps
         let sender = wvote.sender;
+        // TODO: Check instant >= justification instants.
         // Check that the panorama is consistent.
         if (wvote.values.is_none() && wvote.panorama.is_empty())
             || !self.is_panorama_valid(&wvote.panorama)
@@ -420,6 +432,7 @@ pub mod tests {
             sender,
             values: None,
             seq_number: hash[1..].parse().unwrap(),
+            instant: 0,
         }
     }
 
@@ -444,7 +457,7 @@ pub mod tests {
 
     #[test]
     fn add_vote() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
 
         // Create votes as follows; a0, b0 are blocks:
         //
@@ -491,7 +504,7 @@ pub mod tests {
 
     #[test]
     fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
         let a = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"];
         state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).with_value("a"))?;
         for i in 1..a.len() {
@@ -516,7 +529,7 @@ pub mod tests {
 
     #[test]
     fn fork_choice() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
 
         // Create blocks with scores as follows:
         //

@@ -41,4 +41,5 @@ pub struct WireVote<C: Context> {
     pub sender: ValidatorIndex,
     pub values: Option<Vec<C::ConsensusValue>>,
     pub seq_number: u64,
+    pub instant: u64,
 }
