@@ -4,7 +4,7 @@ use crate::{
     state::{State, Weight},
     traits::{ConsensusValueT, Context},
     validators::ValidatorIndex,
-    vote::{Observation, Panorama, Vote},
+    vote::{Observation, Vote},
 };
 
 /// A list containing the earliest level-n messages of each member of some committee, for some n.
@@ -86,18 +86,22 @@ impl<'a, C: Context> Section<'a, C> {
     /// Returns the total weight of the `committee`'s members whose message in this section is seen
     /// by `vote`.
     fn seen_weight(&self, vote: &Vote<C>, committee: &[ValidatorIndex]) -> Weight {
-        let pan = &vote.panorama;
         let to_weight = |&idx: &ValidatorIndex| self.state.weight(idx);
-        let is_seen = |&&idx: &&ValidatorIndex| vote.sender == idx || self.can_see(pan, idx);
+        let is_seen = |&&idx: &&ValidatorIndex| self.can_see(vote, idx);
         committee.iter().filter(is_seen).map(to_weight).sum()
     }
 
-    /// Returns whether `pan` can see `idx`'s vote in `self`.
-    fn can_see(&self, pan: &Panorama<C>, idx: ValidatorIndex) -> bool {
-        match (pan.get(idx).correct(), self.sequence_numbers.get(&idx)) {
-            (Some(vhash), Some(self_sn)) => self.state.vote(vhash).seq_number >= *self_sn,
-            (_, _) => false,
-        }
+    /// Returns whether `vote` can see `idx`'s vote in `self`, where `vote` is considered to see
+    /// itself.
+    fn can_see(&self, vote: &Vote<C>, idx: ValidatorIndex) -> bool {
+        self.sequence_numbers.get(&idx).map_or(false, |self_sn| {
+            if vote.sender == idx {
+                vote.seq_number >= *self_sn
+            } else {
+                let sees_self_sn = |vhash| self.state.vote(vhash).seq_number >= *self_sn;
+                vote.panorama.get(idx).correct().map_or(false, sees_self_sn)
+            }
+        })
     }
 }
 
@@ -149,7 +153,11 @@ impl<C: Context> FinalityDetector<C> {
             return FinalityResult::FttExceeded;
         }
         if let Some(candidate) = self.next_candidate(state) {
-            let mut target_lvl = 64; // Levels higher than 64 can't have an effect on a u64 FTT.
+            // For `lvl` → ∞, the quorum converges to a fixed value. After level 64, it is closer
+            // to that limit than 1/2^-64. This won't make a difference in practice, so there is no
+            // point looking for higher summits. It is also too small to be represented in our
+            // 64-bit weight type.
+            let mut target_lvl = 64;
             while target_lvl > 0 {
                 let lvl = self.find_summit(target_lvl, total_w, fault_w, candidate, state);
                 if lvl == target_lvl {
