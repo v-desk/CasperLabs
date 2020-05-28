@@ -94,16 +94,18 @@ impl<B: Block> Pothole<B> {
     }
 
     /// Handles a notification about a new block having been finalized.
-    pub fn handle_new_block(&mut self, index: BlockIndex, block: B) -> Vec<PotholeResult<B>> {
+    pub fn handle_new_block(
+        &mut self,
+        index: BlockIndex,
+        block: B,
+    ) -> Result<Vec<PotholeResult<B>>, BTreeSet<BlockIndex>> {
         match self {
-            Pothole::Dictator { .. } => Vec::new(),
-            Pothole::Follower { chain } => {
-                if chain.insert(index, block.clone()).is_none() {
-                    vec![PotholeResult::FinalizedBlock(index, block)]
-                } else {
-                    vec![]
-                }
-            }
+            Pothole::Dictator { .. } => Ok(Vec::new()),
+            Pothole::Follower { chain } => match chain.insert(index, block.clone()) {
+                Ok(None) => Ok(vec![PotholeResult::FinalizedBlock(index, block)]),
+                Ok(Some(_)) => Ok(vec![]),
+                Err(next_index) => Err((next_index..index).collect()),
+            },
         }
     }
 

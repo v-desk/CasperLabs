@@ -32,12 +32,15 @@ impl<B> Chain<B> {
 
     /// Inserts a new block at a given index. Returns the block that was already at this index, if
     /// any.
-    pub fn insert(&mut self, index: BlockIndex, block: B) -> Option<B> {
-        let result = self.blocks.insert(index, block);
-        if index >= self.next_block {
-            self.next_block = index + 1;
+    /// An Err() result means that the block wasn't the next one supposed to be inserted; the next
+    /// expected index is returned along with the block
+    pub fn insert(&mut self, index: BlockIndex, block: B) -> Result<Option<B>, BlockIndex> {
+        if index > self.next_block {
+            return Err(self.next_block);
         }
-        result
+        let result = self.blocks.insert(index, block);
+        self.next_block += 1;
+        Ok(result)
     }
 
     /// Returns the reference to the last known block.

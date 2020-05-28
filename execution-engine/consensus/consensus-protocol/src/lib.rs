@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use std::{hash::Hash, time::Instant};
 
+mod impls;
 mod protocol_state;
 mod synchronizer;
 
@@ -35,21 +36,23 @@ pub enum ConsensusProtocolResult<Ctx: ConsensusContext> {
     CreatedNewMessage(Ctx::Message),
     InvalidIncomingMessage(Ctx::Message, anyhow::Error),
     ScheduleTimer(Instant, TimerId),
+    CreateNewBlock,
+    FinalizedBlock(Ctx::ConsensusValue),
 }
 
 /// An API for a single instance of the consensus.
 pub trait ConsensusProtocol<Ctx: ConsensusContext> {
     /// Handle an incoming message (like NewVote, RequestDependency).
     fn handle_message(
-        &self,
+        &mut self,
         msg: Ctx::Message,
-    ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
+    ) -> Result<Vec<ConsensusProtocolResult<Ctx>>, anyhow::Error>;
 
     /// Triggers consensus' timer.
     fn handle_timer(
-        &self,
+        &mut self,
         timer_id: TimerId,
-    ) -> Result<ConsensusProtocolResult<Ctx>, anyhow::Error>;
+    ) -> Result<Vec<ConsensusProtocolResult<Ctx>>, anyhow::Error>;
 }
 
 #[cfg(test)]
@@ -99,9 +102,9 @@ mod example {
         for DagSynchronizerState<VIdU64, DummyVertex, DeployHash, P>
     {
         fn handle_message(
-            &self,
+            &mut self,
             msg: <HighwayContext as ConsensusContext>::Message,
-        ) -> Result<ConsensusProtocolResult<HighwayContext>, Error> {
+        ) -> Result<Vec<ConsensusProtocolResult<HighwayContext>>, Error> {
             match msg {
                 HighwayMessage::RequestVertex(_v_id) => unimplemented!(),
                 HighwayMessage::NewVertex(_vertex) => unimplemented!(),
@@ -109,9 +112,9 @@ mod example {
         }
 
         fn handle_timer(
-            &self,
+            &mut self,
             _timer_id: TimerId,
-        ) -> Result<ConsensusProtocolResult<HighwayContext>, Error> {
+        ) -> Result<Vec<ConsensusProtocolResult<HighwayContext>>, Error> {
             unimplemented!()
         }
     }

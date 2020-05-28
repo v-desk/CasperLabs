@@ -39,7 +39,7 @@ struct EraInstance<Id> {
 
 /// API between the reactor and consensus component.
 pub trait ConsensusService {
-    fn handle_event(&mut self, event: Event) -> Result<Effect<Event>, ConsensusServiceError>;
+    fn handle_event(&mut self, event: Event) -> Result<Vec<Effect<Event>>, ConsensusServiceError>;
 }
 
 struct EraSupervisor<C: ConsensusContext> {
@@ -53,45 +53,64 @@ impl<C: ConsensusContext> ConsensusService for EraSupervisor<C>
 where
     C::Message: TryFrom<MessageWireFormat> + Into<MessageWireFormat>,
 {
-    fn handle_event(&mut self, event: Event) -> Result<Effect<Event>, ConsensusServiceError> {
+    fn handle_event(&mut self, event: Event) -> Result<Vec<Effect<Event>>, ConsensusServiceError> {
         match event {
-            Event::Timer(era_id, timer_id) => match self.active_eras.get(&era_id) {
+            Event::Timer(era_id, timer_id) => match self.active_eras.get_mut(&era_id) {
                 None => todo!("Handle missing eras."),
                 Some(consensus) => consensus
                     .handle_timer(timer_id)
-                    .map(|result| match result {
-                        ConsensusProtocolResult::InvalidIncomingMessage(_msg, _error) => {
-                            unimplemented!()
-                        }
-                        ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
-                            let _wire_msg: MessageWireFormat = out_msg.into();
-                            todo!("Create an effect to broadcast new msg")
-                        }
-                        ConsensusProtocolResult::ScheduleTimer(_delay, _timer_id) => {
-                            unimplemented!()
-                        }
+                    .map(|result_vec| {
+                        result_vec
+                            .into_iter()
+                            .map(|result| match result {
+                                ConsensusProtocolResult::InvalidIncomingMessage(_msg, _error) => {
+                                    unimplemented!()
+                                }
+                                ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
+                                    let _wire_msg: MessageWireFormat = out_msg.into();
+                                    todo!("Create an effect to broadcast new msg")
+                                }
+                                ConsensusProtocolResult::ScheduleTimer(_delay, _timer_id) => {
+                                    unimplemented!()
+                                }
+                                ConsensusProtocolResult::CreateNewBlock => unimplemented!(),
+                                ConsensusProtocolResult::FinalizedBlock(_block) => unimplemented!(),
+                            })
+                            .collect()
                     })
                     .map_err(ConsensusServiceError::InternalError),
             },
-            Event::IncomingMessage(wire_msg) => match self.active_eras.get(&wire_msg.era_id) {
+            Event::IncomingMessage(wire_msg) => match self.active_eras.get_mut(&wire_msg.era_id) {
                 None => todo!("Handle missing eras."),
                 Some(consensus) => {
                     let message: C::Message = wire_msg
                         .try_into()
                         .map_err(|_| ConsensusServiceError::InvalidFormat("".to_string()))?;
-                    let _ = consensus
+                    consensus
                         .handle_message(message)
-                        .map(|result| match result {
-                            ConsensusProtocolResult::InvalidIncomingMessage(_msg, _error) => {}
-                            ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
-                                let _wire_msg: MessageWireFormat = out_msg.into();
-                                todo!("Create an effect to broadcast new msg")
-                            }
-                            ConsensusProtocolResult::ScheduleTimer(_delay, _timer_id) => {
-                                unimplemented!()
-                            }
-                        });
-                    Ok(Effect::Nothing)
+                        .map(|result_vec| {
+                            result_vec
+                                .into_iter()
+                                .map(|result| match result {
+                                    ConsensusProtocolResult::InvalidIncomingMessage(
+                                        _msg,
+                                        _error,
+                                    ) => unimplemented!(),
+                                    ConsensusProtocolResult::CreatedNewMessage(out_msg) => {
+                                        let _wire_msg: MessageWireFormat = out_msg.into();
+                                        todo!("Create an effect to broadcast new msg")
+                                    }
+                                    ConsensusProtocolResult::ScheduleTimer(_delay, _timer_id) => {
+                                        unimplemented!()
+                                    }
+                                    ConsensusProtocolResult::CreateNewBlock => unimplemented!(),
+                                    ConsensusProtocolResult::FinalizedBlock(_block) => {
+                                        unimplemented!()
+                                    }
+                                })
+                                .collect()
+                        })
+                        .map_err(ConsensusServiceError::InternalError)
                 }
             },
         }

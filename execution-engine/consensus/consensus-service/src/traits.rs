@@ -9,7 +9,6 @@ use std::time::Instant;
 pub enum Effect<Ev> {
     DelayEvent(Instant, TimerId),
     NewMessage(Ev),
-    Nothing,
 }
 
 //TODO: Stopgap structs that will be replaced with actual wire models.
