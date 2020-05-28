@@ -74,6 +74,7 @@ where
                                     unimplemented!()
                                 }
                                 ConsensusProtocolResult::CreateNewBlock => unimplemented!(),
+                                ConsensusProtocolResult::FinalizedBlock(_block) => unimplemented!(),
                             })
                             .collect()
                     })
@@ -103,6 +104,9 @@ where
                                         unimplemented!()
                                     }
                                     ConsensusProtocolResult::CreateNewBlock => unimplemented!(),
+                                    ConsensusProtocolResult::FinalizedBlock(_block) => {
+                                        unimplemented!()
+                                    }
                                 })
                                 .collect()
                         })

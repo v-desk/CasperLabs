@@ -138,7 +138,7 @@ impl<N: NodeId, B: Block + Hash + Eq> PotholeWithSynchronizer<N, B> {
     }
 }
 
-fn into_consenus_result<N: NodeId, B: Block + Hash + Eq>(
+fn into_consensus_result<N: NodeId, B: Block + Hash + Eq>(
     pothole_result: PotholeResult<B>,
 ) -> Option<ConsensusProtocolResult<PotholeContext<N, B>>> {
     match pothole_result {
@@ -146,7 +146,9 @@ fn into_consenus_result<N: NodeId, B: Block + Hash + Eq>(
             ConsensusProtocolResult::ScheduleTimer(instant, TimerId(timer_id)),
         ),
         PotholeResult::CreateNewBlock => Some(ConsensusProtocolResult::CreateNewBlock),
-        _ => None,
+        PotholeResult::FinalizedBlock(_, block) => {
+            Some(ConsensusProtocolResult::FinalizedBlock(block))
+        }
     }
 }
 
@@ -174,7 +176,7 @@ impl<N: NodeId, B: Block + Hash + Eq> ConsensusProtocol<PotholeContext<N, B>>
             .pothole
             .handle_timer(timer_id.0)
             .into_iter()
-            .filter_map(into_consenus_result)
+            .filter_map(into_consensus_result)
             .collect())
     }
 }
