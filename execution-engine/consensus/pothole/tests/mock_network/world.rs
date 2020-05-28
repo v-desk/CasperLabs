@@ -150,7 +150,7 @@ mod tests {
 
         assert!(world.fire_timers(node_id).is_empty());
 
-        world.advance_time(one_second);
+        world.advance_time(two_seconds);
 
         assert!(world.fire_timers(node_id).len() == 1);
     }
