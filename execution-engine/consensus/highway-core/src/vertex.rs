@@ -1,11 +1,13 @@
 use std::iter;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{evidence::Evidence, traits::Context, validators::ValidatorIndex, vote::Panorama};
 
 /// A dependency of a `Vertex` that can be satisfied by one or more other vertices.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Dependency<C: Context> {
-    Vote(C::VoteHash),
+    Vote(C::Hash),
     Evidence(ValidatorIndex),
 }
 
@@ -34,11 +36,23 @@ impl<C: Context> Vertex<C> {
 }
 
 /// A vote as it is sent over the wire, possibly containing a new block.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "C::Hash: Serialize",
+    deserialize = "C::Hash: Deserialize<'de>",
+))]
 pub struct WireVote<C: Context> {
-    pub hash: C::VoteHash,
     pub panorama: Panorama<C>,
     pub sender: ValidatorIndex,
     pub values: Option<Vec<C::ConsensusValue>>,
     pub seq_number: u64,
+}
+
+impl<C: Context> WireVote<C> {
+    /// Returns the vote's hash, which is used as a vote identifier.
+    // TODO: This involves serializing and hashing. Memoize?
+    pub fn hash(&self) -> C::Hash {
+        // TODO: Use serialize_into to avoid allocation?
+        C::hash(&bincode::serialize(self).expect("serialize WireVote"))
+    }
 }

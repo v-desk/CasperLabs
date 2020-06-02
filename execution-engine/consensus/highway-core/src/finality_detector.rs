@@ -21,9 +21,9 @@ impl<'a, C: Context> Section<'a, C> {
     /// Creates a section assigning to each validator their level-0 vote, i.e. the oldest vote in
     /// their current streak of votes for `candidate` (and descendants), or `None` if their latest
     /// vote is not for `candidate`.
-    fn level0(candidate: &'a C::VoteHash, state: &'a State<C>) -> Self {
+    fn level0(candidate: &'a C::Hash, state: &'a State<C>) -> Self {
         let height = state.block(candidate).height;
-        let to_lvl0vote = |(idx, vhash): (ValidatorIndex, &'a C::VoteHash)| {
+        let to_lvl0vote = |(idx, vhash): (ValidatorIndex, &'a C::Hash)| {
             state
                 .swimlane(vhash)
                 .take_while(|(_, vote)| state.find_ancestor(&vote.block, height) == Some(candidate))
@@ -124,7 +124,7 @@ pub enum FinalityResult<V: ConsensusValueT> {
 #[derive(Debug)]
 pub struct FinalityDetector<C: Context> {
     /// The most recent known finalized block.
-    last_finalized: Option<C::VoteHash>,
+    last_finalized: Option<C::Hash>,
     /// The fault tolerance threshold.
     ftt: Weight,
 }
@@ -184,7 +184,7 @@ impl<C: Context> FinalityDetector<C> {
         target_lvl: usize,
         total_w: Weight,
         fault_w: Weight,
-        candidate: &C::VoteHash,
+        candidate: &C::Hash,
         state: &State<C>,
     ) -> usize {
         let quorum = self.quorum_for_lvl(target_lvl, total_w) - fault_w;
@@ -208,7 +208,7 @@ impl<C: Context> FinalityDetector<C> {
 
     /// Returns the next candidate for finalization, i.e. the lowest block in the fork choice that
     /// has not been finalized yet.
-    fn next_candidate<'a>(&self, state: &'a State<C>) -> Option<&'a C::VoteHash> {
+    fn next_candidate<'a>(&self, state: &'a State<C>) -> Option<&'a C::Hash> {
         let fork_choice = state.fork_choice(state.panorama())?;
         state.find_ancestor(fork_choice, self.next_height(state))
     }
@@ -236,12 +236,12 @@ mod tests {
         // b0: 10           b1: 4
         //        \
         //          c0: 1 — c1: 1
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("B0"))?;
-        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).with_value("C0"))?;
-        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).with_value("C1"))?;
-        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).with_value("A0"))?;
-        state.add_vote(vote("a1", ALICE, ["a0", "b0", "c1"]).with_value("A1"))?;
-        state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]).with_value("B1"))?;
+        add_vote!(state, b0, BOB, 0; N, N, N; 0xB0);
+        add_vote!(state, c0, CAROL, 0; N, b0, N; 0xC0);
+        add_vote!(state, c1, CAROL, 1; N, b0, c0; 0xC1);
+        add_vote!(state, a0, ALICE, 0; N, b0, N; 0xA0);
+        add_vote!(state, a1, ALICE, 1; a0, b0, c1; 0xA1);
+        add_vote!(state, b1, BOB, 1; a0, b0, N; 0xB1);
 
         let mut fd4 = FinalityDetector::new(Weight(4)); // Fault tolerance 4.
         let mut fd6 = FinalityDetector::new(Weight(6)); // Fault tolerance 6.
@@ -252,21 +252,21 @@ mod tests {
         // `b0`, `a0` are level 0 for `B0`. `a0`, `b1` are level 1.
         // So the fault tolerance of `B0` is 2 * (9 - 10/2) * (1 - 1/2) = 4.
         assert_eq!(FinalityResult::None, fd6.run(&state));
-        assert_eq!(FinalityResult::Finalized(vec!["B0"]), fd4.run(&state));
+        assert_eq!(FinalityResult::Finalized(vec![0xB0]), fd4.run(&state));
         assert_eq!(FinalityResult::None, fd4.run(&state));
 
         // Adding another level to the summit increases `B0`'s fault tolerance to 6.
-        state.add_vote(vote("a2", ALICE, ["a1", "b1", "c1"]))?;
-        state.add_vote(vote("b2", BOB, ["a1", "b1", "c1"]))?;
-        assert_eq!(FinalityResult::Finalized(vec!["B0"]), fd6.run(&state));
+        add_vote!(state, _a2, ALICE, 2; a1, b1, c1);
+        add_vote!(state, _b2, BOB, 2; a1, b1, c1);
+        assert_eq!(FinalityResult::Finalized(vec![0xB0]), fd6.run(&state));
         assert_eq!(FinalityResult::None, fd6.run(&state));
 
         // If Alice equivocates, the FTT 4 is exceeded, but she counts as being part of any summit,
         // so `A0` and `A1` get FTT 6. (Bob voted for `A1` and against `B1` in `b2`.)
-        state.add_vote(vote("e2", ALICE, ["a1", "b1", "c1"]))?;
+        add_vote!(state, _e2, BOB, 2; a1, b1, c1);
         assert_eq!(FinalityResult::FttExceeded, fd4.run(&state));
-        assert_eq!(FinalityResult::Finalized(vec!["A0"]), fd6.run(&state));
-        assert_eq!(FinalityResult::Finalized(vec!["A1"]), fd6.run(&state));
+        assert_eq!(FinalityResult::Finalized(vec![0xA0]), fd6.run(&state));
+        assert_eq!(FinalityResult::Finalized(vec![0xA1]), fd6.run(&state));
         assert_eq!(FinalityResult::None, fd6.run(&state));
         Ok(())
     }

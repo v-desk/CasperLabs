@@ -27,6 +27,11 @@
 //! or with some other governance system that can add and remove validators, by starting a new
 //! protocol instance whenever the set of validators changes.
 
+// This needs to come before the other modules, so the macros are available everywhere.
+#[cfg(test)]
+#[macro_use]
+mod test_macros;
+
 pub mod active_validator;
 pub mod finality_detector;
 pub mod highway;

@@ -9,7 +9,7 @@ pub enum Effect<C: Context> {
     /// `step` needs to be called at this time.
     ScheduleTimer(Instant),
     /// `propose` needs to be called with a value for a new block with the specified parent.
-    RequestNewBlock(Option<C::VoteHash>),
+    RequestNewBlock(Option<C::Hash>),
 }
 
 /// A validator that actively participates in consensus by creating new vertices.

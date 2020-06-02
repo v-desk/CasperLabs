@@ -1,7 +1,9 @@
 use std::{collections::HashMap, hash::Hash, iter::FromIterator};
 
+use serde::{Deserialize, Serialize};
+
 /// The index of a validator, in a list of all validators, ordered by ID.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ValidatorIndex(pub u32);
 
 impl From<u32> for ValidatorIndex {

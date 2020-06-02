@@ -64,9 +64,9 @@ pub struct State<C: Context> {
     weights: Vec<Weight>,
     /// All votes imported so far, by hash.
     // TODO: HashMaps prevent deterministic tests.
-    votes: HashMap<C::VoteHash, Vote<C>>,
+    votes: HashMap<C::Hash, Vote<C>>,
     /// All blocks, by hash.
-    blocks: HashMap<C::VoteHash, Block<C>>,
+    blocks: HashMap<C::Hash, Block<C>>,
     /// Evidence to prove a validator malicious, by index.
     evidence: HashMap<ValidatorIndex, Evidence<C>>,
     /// The full panorama, corresponding to the complete protocol state.
@@ -95,27 +95,27 @@ impl<C: Context> State<C> {
     }
 
     /// Returns the vote with the given hash, if present.
-    pub fn opt_vote(&self, hash: &C::VoteHash) -> Option<&Vote<C>> {
+    pub fn opt_vote(&self, hash: &C::Hash) -> Option<&Vote<C>> {
         self.votes.get(hash)
     }
 
     /// Returns whether the vote with the given hash is known.
-    pub fn has_vote(&self, hash: &C::VoteHash) -> bool {
+    pub fn has_vote(&self, hash: &C::Hash) -> bool {
         self.votes.contains_key(hash)
     }
 
     /// Returns the vote with the given hash. Panics if not found.
-    pub fn vote(&self, hash: &C::VoteHash) -> &Vote<C> {
+    pub fn vote(&self, hash: &C::Hash) -> &Vote<C> {
         self.opt_vote(hash).unwrap()
     }
 
     /// Returns the block contained in the vote with the given hash, if present.
-    pub fn opt_block(&self, hash: &C::VoteHash) -> Option<&Block<C>> {
+    pub fn opt_block(&self, hash: &C::Hash) -> Option<&Block<C>> {
         self.blocks.get(hash)
     }
 
     /// Returns the block contained in the vote with the given hash. Panics if not found.
-    pub fn block(&self, hash: &C::VoteHash) -> &Block<C> {
+    pub fn block(&self, hash: &C::Hash) -> &Block<C> {
         self.opt_block(hash).unwrap()
     }
 
@@ -140,7 +140,7 @@ impl<C: Context> State<C> {
             return Err(wvote.with_error(err));
         }
         self.update_panorama(&wvote);
-        let hash = wvote.hash.clone();
+        let hash = wvote.hash();
         let fork_choice = self.fork_choice(&wvote.panorama).cloned();
         let (vote, opt_values) = Vote::new(wvote, fork_choice.as_ref(), self);
         if let Some(values) = opt_values {
@@ -156,12 +156,11 @@ impl<C: Context> State<C> {
         self.evidence.insert(idx, evidence);
     }
 
-    pub fn wire_vote(&self, hash: C::VoteHash) -> Option<WireVote<C>> {
-        let vote = self.opt_vote(&hash)?.clone();
-        let opt_block = self.opt_block(&hash);
+    pub fn wire_vote(&self, hash: &C::Hash) -> Option<WireVote<C>> {
+        let vote = self.opt_vote(hash)?.clone();
+        let opt_block = self.opt_block(hash);
         let values = opt_block.map(|block| block.values.clone());
         Some(WireVote {
-            hash,
             panorama: vote.panorama.clone(),
             sender: vote.sender,
             values,
@@ -181,7 +180,7 @@ impl<C: Context> State<C> {
     /// all of its ancestors. At each level the block with the highest score is selected from the
     /// children of the previously selected block (or from all blocks at height 0), until a block
     /// is reached that has no children with any votes.
-    pub fn fork_choice<'a>(&'a self, pan: &Panorama<C>) -> Option<&'a C::VoteHash> {
+    pub fn fork_choice<'a>(&'a self, pan: &Panorama<C>) -> Option<&'a C::Hash> {
         // Collect all correct votes in a `Tallies` map, sorted by height.
         let to_entry = |(obs, w): (&Observation<C>, &Weight)| {
             let bhash = &self.vote(obs.correct()?).block;
@@ -202,11 +201,7 @@ impl<C: Context> State<C> {
 
     /// Returns the ancestor of the block with the given `hash`, on the specified `height`, or
     /// `None` if the block's height is lower than that.
-    pub fn find_ancestor<'a>(
-        &'a self,
-        hash: &'a C::VoteHash,
-        height: u64,
-    ) -> Option<&'a C::VoteHash> {
+    pub fn find_ancestor<'a>(&'a self, hash: &'a C::Hash, height: u64) -> Option<&'a C::Hash> {
         let block = self.block(hash);
         if block.height < height {
             return None;
@@ -245,19 +240,19 @@ impl<C: Context> State<C> {
 
     /// Update `self.panorama` with an incoming vote. Panics if dependencies are missing.
     ///
-    /// If the new vote is valid, it will just add `Observation::Correct(wvote.hash)` to the
+    /// If the new vote is valid, it will just add `Observation::Correct(wvote.hash())` to the
     /// panorama. If it represents an equivocation, it adds `Observation::Faulty` and updates
     /// `self.evidence`.
     fn update_panorama(&mut self, wvote: &WireVote<C>) {
         let sender = wvote.sender;
         let new_obs = match (self.panorama.get(sender), wvote.panorama.get(sender)) {
             (Observation::Faulty, _) => Observation::Faulty,
-            (obs0, obs1) if obs0 == obs1 => Observation::Correct(wvote.hash.clone()),
+            (obs0, obs1) if obs0 == obs1 => Observation::Correct(wvote.hash()),
             (Observation::None, _) => panic!("missing own previous vote"),
             (Observation::Correct(hash0), _) => {
                 if !self.has_evidence(sender) {
                     let prev0 = self.find_in_swimlane(hash0, wvote.seq_number);
-                    let wvote0 = self.wire_vote(prev0.clone()).unwrap();
+                    let wvote0 = self.wire_vote(prev0).unwrap();
                     self.add_evidence(Evidence::Equivocation(wvote0, wvote.clone()));
                 }
                 Observation::Faulty
@@ -268,7 +263,7 @@ impl<C: Context> State<C> {
 
     /// Returns the hash of the message with the given sequence number from the sender of `hash`.
     /// Panics if the sequence number is higher than that of the vote with `hash`.
-    fn find_in_swimlane<'a>(&'a self, hash: &'a C::VoteHash, seq_number: u64) -> &'a C::VoteHash {
+    fn find_in_swimlane<'a>(&'a self, hash: &'a C::Hash, seq_number: u64) -> &'a C::Hash {
         let vote = self.vote(hash);
         if vote.seq_number == seq_number {
             return hash;
@@ -285,8 +280,8 @@ impl<C: Context> State<C> {
     /// order, starting with the specified vote.
     pub fn swimlane<'a>(
         &'a self,
-        vhash: &'a C::VoteHash,
-    ) -> impl Iterator<Item = (&'a C::VoteHash, &'a Vote<C>)> {
+        vhash: &'a C::Hash,
+    ) -> impl Iterator<Item = (&'a C::Hash, &'a Vote<C>)> {
         let mut next = Some(vhash);
         iter::from_fn(move || {
             let current = next?;
@@ -318,7 +313,7 @@ impl<C: Context> State<C> {
     }
 
     /// Returns `true` if `pan` sees the sender of `hash` as correct, and sees that vote.
-    fn sees_correct(&self, pan: &Panorama<C>, hash: &C::VoteHash) -> bool {
+    fn sees_correct(&self, pan: &Panorama<C>, hash: &C::Hash) -> bool {
         let vote = self.vote(hash);
         pan.get(vote.sender).correct().map_or(false, |latest_hash| {
             hash == self.find_in_swimlane(latest_hash, vote.seq_number)
@@ -361,6 +356,8 @@ fn log2(x: u64) -> u32 {
 
 #[cfg(test)]
 pub mod tests {
+    use std::{collections::hash_map::DefaultHasher, hash::Hasher};
+
     use crate::traits::ValidatorSecret;
 
     use super::*;
@@ -370,6 +367,9 @@ pub mod tests {
     pub const ALICE: ValidatorIndex = ValidatorIndex(0);
     pub const BOB: ValidatorIndex = ValidatorIndex(1);
     pub const CAROL: ValidatorIndex = ValidatorIndex(2);
+
+    pub const N: Observation<TestContext> = Observation::None;
+    pub const F: Observation<TestContext> = Observation::Faulty;
 
     #[derive(Clone, Debug, PartialEq)]
     pub struct TestContext;
@@ -386,54 +386,22 @@ pub mod tests {
     }
 
     impl Context for TestContext {
-        type ConsensusValue = &'static str;
+        type ConsensusValue = u16;
         type ValidatorId = &'static str;
         type ValidatorSecret = TestSecret;
-        type VoteHash = &'static str;
-        type InstanceId = &'static str;
-    }
+        type Hash = u64;
+        type InstanceId = u64;
 
-    /// Converts a string to an observation: "F" means faulty, "_" means none, and other strings
-    /// are used as the identifier ("hash") of a correct vote.
-    pub fn to_obs(s: &&'static str) -> Observation<TestContext> {
-        match *s {
-            "_" => Observation::None,
-            "F" => Observation::Faulty,
-            s => Observation::Correct(s),
+        fn hash(data: &[u8]) -> Self::Hash {
+            let mut hasher = DefaultHasher::new();
+            hasher.write(data);
+            hasher.finish()
         }
     }
 
-    /// Creates a panorama based on observation descriptions as in `to_obs`.
-    pub fn panorama(observations: [&'static str; 3]) -> Panorama<TestContext> {
-        Panorama(observations.iter().map(to_obs).collect())
-    }
-
-    /// Creates a new ballot vote. The hash must be a letter, followed by the sequence number.
-    pub fn vote(
-        hash: &'static str,
-        sender: ValidatorIndex,
-        observations: [&'static str; 3],
-    ) -> WireVote<TestContext> {
-        WireVote {
-            hash,
-            panorama: panorama(observations),
-            sender,
-            values: None,
-            seq_number: hash[1..].parse().unwrap(),
-        }
-    }
-
-    impl WireVote<TestContext> {
-        /// Adds a value to the vote, turning it into a new block.
-        pub fn with_value(mut self, value: &'static str) -> Self {
-            self.values = match self.values {
-                None => Some(vec![value]),
-                Some(mut values) => {
-                    values.push(value);
-                    Some(values)
-                }
-            };
-            self
+    impl From<<TestContext as Context>::Hash> for Observation<TestContext> {
+        fn from(vhash: <TestContext as Context>::Hash) -> Self {
+            Observation::Correct(vhash)
         }
     }
 
@@ -453,49 +421,54 @@ pub mod tests {
         // Bob:   b0 —— b1
         //          \  /
         // Carol:    c0
-        state.add_vote(vote("a0", ALICE, ["_", "_", "_"]).with_value("a"))?;
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("b"))?;
-        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]))?;
-        state.add_vote(vote("b1", BOB, ["_", "b0", "c0"]))?;
-        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c0"]))?;
+        add_vote!(state, a0, ALICE, 0; N, N, N; 0xA);
+        add_vote!(state, b0, BOB, 0; N, N, N; 0xB);
+        add_vote!(state, c0, CAROL, 0; N, b0, N);
+        add_vote!(state, b1, BOB, 1; N, b0, c0);
+        add_vote!(state, _a1, ALICE, 1; a0, b1, c0);
 
         // Wrong sequence number: Carol hasn't produced c1 yet.
-        let opt_err = state.add_vote(vote("c2", CAROL, ["_", "b1", "c0"])).err();
-        assert_eq!(Some(VoteError::SequenceNumber), opt_err.map(vote_err));
+        let vote = vote!(CAROL, 2; N, b1, c0);
+        let opt_err = state.add_vote(vote).err().map(vote_err);
+        assert_eq!(Some(VoteError::SequenceNumber), opt_err);
         // Inconsistent panorama: If you see b1, you have to see c0, too.
-        let opt_err = state.add_vote(vote("c1", CAROL, ["_", "b1", "_"])).err();
-        assert_eq!(Some(VoteError::Panorama), opt_err.map(vote_err));
+        let vote = vote!(CAROL, 1; N, b1, N);
+        let opt_err = state.add_vote(vote).err().map(vote_err);
+        assert_eq!(Some(VoteError::Panorama), opt_err);
 
         // Alice has not equivocated yet, and not produced message A1.
-        let missing = state.missing_dependency(&panorama(["F", "b1", "c0"]));
+        let missing = state.missing_dependency(&panorama!(F, b1, c0));
         assert_eq!(Some(Dependency::Evidence(ALICE)), missing);
-        let missing = state.missing_dependency(&panorama(["A1", "b1", "c0"]));
-        assert_eq!(Some(Dependency::Vote("A1")), missing);
+        let missing = state.missing_dependency(&panorama!(42, b1, c0));
+        assert_eq!(Some(Dependency::Vote(42)), missing);
 
         // Alice equivocates: A1 doesn't see a1.
-        state.add_vote(vote("A1", ALICE, ["a0", "b1", "c0"]))?;
+        add_vote!(state, ae1, ALICE, 1; a0, b1, c0);
         assert!(state.has_evidence(ALICE));
 
-        let missing = state.missing_dependency(&panorama(["F", "b1", "c0"]));
+        let missing = state.missing_dependency(&panorama!(F, b1, c0));
         assert_eq!(None, missing);
-        let missing = state.missing_dependency(&panorama(["A1", "b1", "c0"]));
+        let missing = state.missing_dependency(&panorama!(ae1, b1, c0));
         assert_eq!(None, missing);
 
         // Bob can see the equivocation.
-        state.add_vote(vote("b2", BOB, ["F", "b1", "c0"]))?;
+        add_vote!(state, b2, BOB, 2; F, b1, c0);
 
         // The state's own panorama has been updated correctly.
-        assert_eq!(state.panorama, panorama(["F", "b2", "c0"]));
+        assert_eq!(state.panorama, panorama!(F, b2, c0));
         Ok(())
     }
 
     #[test]
     fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
         let mut state = State::new(WEIGHTS);
-        let a = ["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"];
-        state.add_vote(vote(a[0], ALICE, ["_", "_", "_"]).with_value("a"))?;
-        for i in 1..a.len() {
-            state.add_vote(vote(a[i], ALICE, [a[i - 1], "_", "_"]))?;
+        let mut a = Vec::new();
+        let vote = vote!(ALICE, 0; N, N, N; Some(vec![0xA]));
+        a.push(vote.hash());
+        state.add_vote(vote)?;
+        for i in 1..10 {
+            add_vote!(state, ai, ALICE, i as u64; a[i - 1], N, N);
+            a.push(ai);
         }
 
         // The predecessor with sequence number i should always equal a[i].
@@ -506,10 +479,10 @@ pub mod tests {
         }
 
         // The skip list index of a[k] includes a[k - 2^i] for each i such that 2^i divides k.
-        assert_eq!(&["a8"], &state.vote(&"a9").skip_idx.as_ref());
+        assert_eq!(&[a[8]], &state.vote(&a[9]).skip_idx.as_ref());
         assert_eq!(
-            &["a7", "a6", "a4", "a0"],
-            &state.vote(&"a8").skip_idx.as_ref()
+            &[a[7], a[6], a[4], a[0]],
+            &state.vote(&a[8]).skip_idx.as_ref()
         );
         Ok(())
     }
@@ -525,19 +498,19 @@ pub mod tests {
         // b0: 12           b2: 4
         //        \
         //          c0: 5 — c1: 5
-        state.add_vote(vote("b0", BOB, ["_", "_", "_"]).with_value("B0"))?;
-        state.add_vote(vote("c0", CAROL, ["_", "b0", "_"]).with_value("C0"))?;
-        state.add_vote(vote("c1", CAROL, ["_", "b0", "c0"]).with_value("C1"))?;
-        state.add_vote(vote("a0", ALICE, ["_", "b0", "_"]).with_value("A0"))?;
-        state.add_vote(vote("b1", BOB, ["a0", "b0", "_"]))?; // Just a ballot; not shown above.
-        state.add_vote(vote("a1", ALICE, ["a0", "b1", "c1"]).with_value("A1"))?;
-        state.add_vote(vote("b2", BOB, ["a0", "b1", "_"]).with_value("B2"))?;
+        add_vote!(state, b0, BOB, 0; N, N, N; 0xB0);
+        add_vote!(state, c0, CAROL, 0; N, b0, N; 0xC0);
+        add_vote!(state, c1, CAROL, 1; N, b0, c0; 0xC1);
+        add_vote!(state, a0, ALICE, 0; N, b0, N; 0xA0);
+        add_vote!(state, b1, BOB, 1; a0, b0, N); // Just a ballot; not shown above.
+        add_vote!(state, a1, ALICE, 1; a0, b1, c1; 0xA1);
+        add_vote!(state, b2, BOB, 2; a0, b1, N; 0xB2);
 
         // Alice built `a1` on top of `a0`, which had already 7 points.
-        assert_eq!(Some(&"a0"), state.block(&state.vote(&"a1").block).parent());
+        assert_eq!(Some(&a0), state.block(&state.vote(&a1).block).parent());
         // The fork choice is now `b2`: At height 1, `a0` wins against `c0`.
         // At height 2, `b2` wins against `a1`. `c1` has most points but is not a child of `a0`.
-        assert_eq!(Some(&"b2"), state.fork_choice(&state.panorama));
+        assert_eq!(Some(&b2), state.fork_choice(&state.panorama));
         Ok(())
     }
 

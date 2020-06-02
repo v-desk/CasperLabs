@@ -9,6 +9,8 @@ repository = "https://github.com/CasperLabs/CasperLabs"
 license-file = "../LICENSE"
 
 [dependencies]
+bincode = "1.2.1"
 derive_more = "0.99.7"
 displaydoc = "0.1.6"
+serde = { version = "1.0.111", features = [ "derive" ] }
 thiserror = "1.0.17"
