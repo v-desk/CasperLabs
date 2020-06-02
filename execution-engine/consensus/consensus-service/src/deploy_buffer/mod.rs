@@ -30,7 +30,7 @@ impl DeployBuffer {
         // finalized blocks from the set `blocks`
         let deploys_to_return =
             blocks
-                .into_iter()
+                .iter()
                 .fold(self.collected_deploys.clone(), |mut set, block_hash| {
                     let empty = HashSet::new();
                     let included_deploys = self.processed.get(block_hash).unwrap_or(&empty)
@@ -105,7 +105,7 @@ mod tests {
         assert!(buffer.remaining_deploys(&blocks).is_empty());
 
         // try adding the same deploy again
-        buffer.add_deploy(deploy2.clone());
+        buffer.add_deploy(deploy2);
 
         // it shouldn't be returned if we include block 1 in the past blocks
         assert!(buffer.remaining_deploys(&blocks).is_empty());
