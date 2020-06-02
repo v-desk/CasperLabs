@@ -21,23 +21,25 @@ impl DeployBuffer {
     }
 
     pub fn add_deploy(&mut self, deploy: Deploy) {
-        // TBD: do we add deploys that already are in `processed` or `finalized`?
-        self.collected_deploys.insert(deploy);
+        // only add the deploy if it isn't contained in a finalized block
+        if !self.finalized.values().any(|block| block.contains(&deploy)) {
+            self.collected_deploys.insert(deploy);
+        }
     }
 
+    /// `blocks` contains the ancestors that haven't been finalized yet - we exclude all the
+    /// deploys from the finalized blocks by default.
     pub fn remaining_deploys(&mut self, blocks: &HashSet<BlockHash>) -> HashSet<Deploy> {
-        // deploys_to_return = all deploys in collected_deploys that aren't in processed or
-        // finalized blocks from the set `blocks`
-        let deploys_to_return =
-            blocks
-                .iter()
-                .fold(self.collected_deploys.clone(), |mut set, block_hash| {
-                    let empty = HashSet::new();
-                    let included_deploys = self.processed.get(block_hash).unwrap_or(&empty)
-                        | self.finalized.get(block_hash).unwrap_or(&empty);
-                    set.retain(|deploy| !included_deploys.contains(deploy));
-                    set
-                });
+        // deploys_to_return = all deploys in collected_deploys that aren't in finalized blocks or
+        // processed blocks from the set `blocks`
+        let deploys_to_return = blocks
+            .iter()
+            .filter_map(|hash| self.processed.get(hash))
+            .chain(self.finalized.values())
+            .fold(self.collected_deploys.clone(), |mut set, other_set| {
+                set.retain(|deploy| !other_set.contains(deploy));
+                set
+            });
         self.collected_deploys
             .retain(|deploy| !deploys_to_return.contains(deploy));
         deploys_to_return
@@ -93,6 +95,7 @@ mod tests {
         assert!(deploys.contains(&deploy1));
         assert!(deploys.contains(&deploy2));
 
+        // the deploys should have been removed
         assert!(buffer.remaining_deploys(&no_blocks).is_empty());
 
         // the two deploys will be included in block 1
@@ -105,10 +108,15 @@ mod tests {
         assert!(buffer.remaining_deploys(&blocks).is_empty());
 
         // try adding the same deploy again
-        buffer.add_deploy(deploy2);
+        buffer.add_deploy(deploy2.clone());
 
         // it shouldn't be returned if we include block 1 in the past blocks
         assert!(buffer.remaining_deploys(&blocks).is_empty());
+        // ...but it should be returned if we don't include it
+        assert!(buffer.remaining_deploys(&no_blocks).len() == 1);
+
+        // the previous check removed the deploy from the buffer, let's re-add it
+        buffer.add_deploy(deploy2);
 
         // finalize the block
         buffer.finalized_block(block_hash1);
@@ -117,8 +125,9 @@ mod tests {
         buffer.add_deploy(deploy3.clone());
         buffer.add_deploy(deploy4.clone());
 
-        let deploys = buffer.remaining_deploys(&blocks);
+        let deploys = buffer.remaining_deploys(&no_blocks);
 
+        // since block 1 is now finalized, deploy2 shouldn't be among the ones returned
         assert_eq!(deploys.len(), 2);
         assert!(deploys.contains(&deploy3));
         assert!(deploys.contains(&deploy4));
