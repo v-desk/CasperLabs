@@ -26,8 +26,8 @@ impl<C: Context> ActiveValidator<C> {
     /// protocol `state`.
     pub fn step(&self, state: &State<C>, instant: u64) -> Vec<Effect<C>> {
         let round_len = 1u64 << self.round_exp;
-        let round_id = instant % round_len;
-        let round_offset = instant - round_id;
+        let round_offset = instant % round_len;
+        let round_id = instant - round_offset;
         if round_offset == 0 && state.leader(round_id) == self.vidx {
             vec![Effect::RequestNewBlock(instant)]
         // TODO: We need HWY-55 first, to be able to create votes with correct hash.
