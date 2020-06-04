@@ -141,7 +141,6 @@ impl<C: Context> FinalityDetector<C> {
     // TODO: Iterate this and return multiple finalized blocks.
     // TODO: Verify the consensus instance ID?
     pub fn run(&mut self, state: &State<C>) -> FinalityResult<C::ConsensusValue> {
-        let total_w: Weight = state.weights().iter().cloned().sum();
         let fault_w: Weight = state
             .panorama()
             .iter()
@@ -159,7 +158,7 @@ impl<C: Context> FinalityDetector<C> {
             // 64-bit weight type.
             let mut target_lvl = 64;
             while target_lvl > 0 {
-                let lvl = self.find_summit(target_lvl, total_w, fault_w, candidate, state);
+                let lvl = self.find_summit(target_lvl, fault_w, candidate, state);
                 if lvl == target_lvl {
                     self.last_finalized = Some(candidate.clone());
                     return FinalityResult::Finalized(state.block(candidate).values.clone());
@@ -182,11 +181,11 @@ impl<C: Context> FinalityDetector<C> {
     fn find_summit(
         &self,
         target_lvl: usize,
-        total_w: Weight,
         fault_w: Weight,
         candidate: &C::VoteHash,
         state: &State<C>,
     ) -> usize {
+        let total_w = state.total_weight();
         let quorum = self.quorum_for_lvl(target_lvl, total_w) - fault_w;
         let sec0 = Section::level0(candidate, &state);
         let sections_iter = iter::successors(Some(sec0), |sec| sec.next(quorum));

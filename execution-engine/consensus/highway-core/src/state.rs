@@ -1,8 +1,8 @@
-use std::{collections::HashMap, iter, ops::Mul};
+use std::{collections::HashMap, convert::identity, iter, ops::Mul};
 
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use displaydoc::Display;
-use rand::{RngCore, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use thiserror::Error;
 
@@ -64,6 +64,9 @@ impl<C: Context> WireVote<C> {
 pub struct State<C: Context> {
     /// The validator's voting weights.
     weights: Vec<Weight>,
+    /// Cumulative validator weights: Entry `i` contains the sum of the weights of validators `0`
+    /// through `i`.
+    cumulative_w: Vec<Weight>,
     /// All votes imported so far, by hash.
     // TODO: HashMaps prevent deterministic tests.
     votes: HashMap<C::VoteHash, Vote<C>>,
@@ -79,8 +82,15 @@ pub struct State<C: Context> {
 
 impl<C: Context> State<C> {
     pub fn new(weights: &[Weight], seed: u64) -> State<C> {
+        let mut sum = Weight(0);
+        let add = |w: &Weight| {
+            sum += *w;
+            sum
+        };
+        let cumulative_w = weights.iter().map(add).collect();
         State {
             weights: weights.to_vec(),
+            cumulative_w,
             votes: HashMap::new(),
             blocks: HashMap::new(),
             evidence: HashMap::new(),
@@ -129,8 +139,14 @@ impl<C: Context> State<C> {
         &self.weights
     }
 
+    /// Returns the `idx`th validator's voting weight.
     pub fn weight(&self, idx: ValidatorIndex) -> Weight {
         self.weights[idx.0 as usize]
+    }
+
+    /// Returns the sum of all validators' voting weights.
+    pub fn total_weight(&self) -> Weight {
+        *self.cumulative_w.last().unwrap()
     }
 
     /// Returns the complete protocol state's latest panorama.
@@ -141,7 +157,10 @@ impl<C: Context> State<C> {
     /// Returns the leader in the specified time slot.
     pub fn leader(&self, instant: u64) -> ValidatorIndex {
         let mut rng = ChaCha8Rng::seed_from_u64(self.seed.wrapping_add(instant));
-        ValidatorIndex(rng.next_u32())
+        // TODO: `rand` doesn't seem to document how it generates this. Needs to be portable.
+        let r = Weight(rng.gen_range(1, self.total_weight().0 + 1));
+        let idx = self.cumulative_w.binary_search(&r).unwrap_or_else(identity);
+        ValidatorIndex(idx as u32)
     }
 
     /// Adds the vote to the protocol state, or returns an error if it is invalid.
