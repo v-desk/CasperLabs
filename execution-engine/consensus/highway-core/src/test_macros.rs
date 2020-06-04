@@ -17,6 +17,7 @@ macro_rules! vote {
             sender: $sender,
             values: $val,
             seq_number: $seq_num,
+            instant: 0,
         }
     };
 }

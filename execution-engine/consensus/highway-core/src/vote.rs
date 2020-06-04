@@ -96,6 +96,8 @@ pub struct Vote<C: Context> {
     /// For every `p = 1 << i` that divides `seq_number`, this contains an `i`-th entry pointing to
     /// the older vote with `seq_number - p`.
     pub skip_idx: Vec<C::Hash>,
+    /// This vote's instant, in milliseconds since the epoch.
+    pub instant: u64,
 }
 
 impl<C: Context> Vote<C> {
@@ -129,6 +131,7 @@ impl<C: Context> Vote<C> {
             sender: wvote.sender,
             block,
             skip_idx,
+            instant: wvote.instant,
         };
         (vote, wvote.values)
     }

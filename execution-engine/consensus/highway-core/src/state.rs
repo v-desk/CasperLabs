@@ -1,7 +1,9 @@
-use std::{collections::HashMap, iter, ops::Mul};
+use std::{collections::HashMap, convert::identity, iter, ops::Mul};
 
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use displaydoc::Display;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use thiserror::Error;
 
 use crate::{
@@ -62,6 +64,9 @@ impl<C: Context> WireVote<C> {
 pub struct State<C: Context> {
     /// The validator's voting weights.
     weights: Vec<Weight>,
+    /// Cumulative validator weights: Entry `i` contains the sum of the weights of validators `0`
+    /// through `i`.
+    cumulative_w: Vec<Weight>,
     /// All votes imported so far, by hash.
     // TODO: HashMaps prevent deterministic tests.
     votes: HashMap<C::Hash, Vote<C>>,
@@ -71,16 +76,26 @@ pub struct State<C: Context> {
     evidence: HashMap<ValidatorIndex, Evidence<C>>,
     /// The full panorama, corresponding to the complete protocol state.
     panorama: Panorama<C>,
+    /// The random seed.
+    seed: u64,
 }
 
 impl<C: Context> State<C> {
-    pub fn new(weights: &[Weight]) -> State<C> {
+    pub fn new(weights: &[Weight], seed: u64) -> State<C> {
+        let mut sum = Weight(0);
+        let add = |w: &Weight| {
+            sum += *w;
+            sum
+        };
+        let cumulative_w = weights.iter().map(add).collect();
         State {
             weights: weights.to_vec(),
+            cumulative_w,
             votes: HashMap::new(),
             blocks: HashMap::new(),
             evidence: HashMap::new(),
             panorama: Panorama::new(weights.len()),
+            seed,
         }
     }
 
@@ -124,13 +139,33 @@ impl<C: Context> State<C> {
         &self.weights
     }
 
+    /// Returns the `idx`th validator's voting weight.
     pub fn weight(&self, idx: ValidatorIndex) -> Weight {
         self.weights[idx.0 as usize]
+    }
+
+    /// Returns the sum of all validators' voting weights.
+    pub fn total_weight(&self) -> Weight {
+        *self.cumulative_w.last().unwrap()
     }
 
     /// Returns the complete protocol state's latest panorama.
     pub fn panorama(&self) -> &Panorama<C> {
         &self.panorama
+    }
+
+    /// Returns the leader in the specified time slot.
+    pub fn leader(&self, instant: u64) -> ValidatorIndex {
+        let mut rng = ChaCha8Rng::seed_from_u64(self.seed.wrapping_add(instant));
+        // TODO: `rand` doesn't seem to document how it generates this. Needs to be portable.
+        // We select a random one out of the `total_weight` weight units, starting numbering at 1.
+        let r = Weight(rng.gen_range(1, self.total_weight().0 + 1));
+        // The weight units are subdivided into intervals that belong to some validator.
+        // `cumulative_w[i]` denotes the last weight unit that belongs to validator `i`.
+        // `binary_search` returns the first `i` with `cumulative_w[i] >= r`, i.e. the validator
+        // who owns the randomly selected weight unit.
+        let idx = self.cumulative_w.binary_search(&r).unwrap_or_else(identity);
+        ValidatorIndex(idx as u32)
     }
 
     /// Adds the vote to the protocol state, or returns an error if it is invalid.
@@ -165,6 +200,7 @@ impl<C: Context> State<C> {
             sender: vote.sender,
             values,
             seq_number: vote.seq_number,
+            instant: vote.instant,
         })
     }
 
@@ -218,8 +254,8 @@ impl<C: Context> State<C> {
 
     /// Returns an error if `wvote` is invalid.
     fn validate_vote(&self, wvote: &WireVote<C>) -> Result<(), VoteError> {
-        // TODO: Timestamps
         let sender = wvote.sender;
+        // TODO: Check instant >= justification instants.
         // Check that the panorama is consistent.
         if (wvote.values.is_none() && wvote.panorama.is_empty())
             || !self.is_panorama_valid(&wvote.panorama)
@@ -412,7 +448,7 @@ pub mod tests {
 
     #[test]
     fn add_vote() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
 
         // Create votes as follows; a0, b0 are blocks:
         //
@@ -461,7 +497,7 @@ pub mod tests {
 
     #[test]
     fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
         let mut a = Vec::new();
         let vote = vote!(ALICE, 0; N, N, N; Some(vec![0xA]));
         a.push(vote.hash());
@@ -489,7 +525,7 @@ pub mod tests {
 
     #[test]
     fn fork_choice() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
 
         // Create blocks with scores as follows:
         //

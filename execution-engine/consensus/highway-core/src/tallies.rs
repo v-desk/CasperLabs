@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn tallies() -> Result<(), AddVoteError<TestContext>> {
-        let mut state = State::new(WEIGHTS);
+        let mut state = State::new(WEIGHTS, 0);
 
         // Create blocks with scores as follows:
         //

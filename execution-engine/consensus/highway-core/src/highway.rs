@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::{
     evidence::Evidence,
     state::{AddVoteError, State},
@@ -35,8 +33,6 @@ pub struct HighwayParams<C: Context> {
     instance_id: C::InstanceId,
     /// The validator IDs and weight map.
     validators: Validators<C::ValidatorId>,
-    /// The duration of a single tick.
-    tick_length: Duration,
 }
 
 /// A passive instance of the Highway protocol, containing its local state.
@@ -53,7 +49,7 @@ pub struct Highway<C: Context> {
 }
 
 impl<C: Context> Highway<C> {
-    /// Try to add an incoming vertex to the protocol highway.
+    /// Try to add an incoming vertex to the protocol state.
     ///
     /// If the vertex is invalid, or if there are dependencies that need to be added first, returns
     /// `Invalid` resp. `MissingDependency`.
