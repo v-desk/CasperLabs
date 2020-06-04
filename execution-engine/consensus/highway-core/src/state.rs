@@ -158,7 +158,12 @@ impl<C: Context> State<C> {
     pub fn leader(&self, instant: u64) -> ValidatorIndex {
         let mut rng = ChaCha8Rng::seed_from_u64(self.seed.wrapping_add(instant));
         // TODO: `rand` doesn't seem to document how it generates this. Needs to be portable.
+        // We select a random one out of the `total_weight` weight units, starting numbering at 1.
         let r = Weight(rng.gen_range(1, self.total_weight().0 + 1));
+        // The weight units are subdivided into intervals that belong to some validator.
+        // `cumulative_w[i]` denotes the last weight unit that belongs to validator `i`.
+        // `binary_search` returns the first `i` with `cumulative_w[i] >= r`, i.e. the validator
+        // who owns the randomly selected weight unit.
         let idx = self.cumulative_w.binary_search(&r).unwrap_or_else(identity);
         ValidatorIndex(idx as u32)
     }
