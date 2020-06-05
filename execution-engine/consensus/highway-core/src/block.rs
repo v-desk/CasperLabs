@@ -11,13 +11,13 @@ pub struct Block<C: Context> {
     ///
     /// For every `p = 1 << i` that divides `height`, this contains an `i`-th entry pointing to the
     /// ancestor with `height - p`.
-    pub skip_idx: Vec<C::VoteHash>,
+    pub skip_idx: Vec<C::Hash>,
 }
 
 impl<C: Context> Block<C> {
     /// Creates a new block with the given parent and values. Panics if parent does not exist.
     pub fn new(
-        parent_hash: Option<C::VoteHash>,
+        parent_hash: Option<C::Hash>,
         values: Vec<C::ConsensusValue>,
         state: &State<C>,
     ) -> Block<C> {
@@ -38,7 +38,7 @@ impl<C: Context> Block<C> {
     }
 
     /// Returns the block's parent, or `None` if it has height 0.
-    pub fn parent(&self) -> Option<&C::VoteHash> {
+    pub fn parent(&self) -> Option<&C::Hash> {
         self.skip_idx.first()
     }
 

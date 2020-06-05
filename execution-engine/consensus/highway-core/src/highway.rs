@@ -67,7 +67,7 @@ impl<C: Context> Highway<C> {
     pub fn get_dependency(&self, dependency: Dependency<C>) -> Option<Vertex<C>> {
         let state = &self.state;
         match dependency {
-            Dependency::Vote(hash) => state.wire_vote(hash).map(Vertex::Vote),
+            Dependency::Vote(hash) => state.wire_vote(&hash).map(Vertex::Vote),
             Dependency::Evidence(idx) => state.opt_evidence(idx).cloned().map(Vertex::Evidence),
         }
     }

@@ -49,12 +49,7 @@ impl<C: Context> ActiveValidator<C> {
         }
     }
 
-    pub fn on_new_vote(
-        &self,
-        vhash: &C::VoteHash,
-        state: &State<C>,
-        instant: u64,
-    ) -> Vec<Effect<C>> {
+    pub fn on_new_vote(&self, vhash: &C::Hash, state: &State<C>, instant: u64) -> Vec<Effect<C>> {
         todo!("{:?}, {:?}, {:?}", vhash, state, instant)
     }
 

@@ -1,16 +1,18 @@
 use std::{fmt::Debug, hash::Hash};
 
+use serde::{de::DeserializeOwned, Serialize};
+
 /// A validator identifier.
 pub trait ValidatorIdT: Eq + Ord + Clone + Debug + Hash {}
 impl<VID> ValidatorIdT for VID where VID: Eq + Ord + Clone + Debug + Hash {}
 
 /// The consensus value type, e.g. a list of transactions.
-pub trait ConsensusValueT: Eq + Clone + Debug + Hash {}
-impl<CV> ConsensusValueT for CV where CV: Eq + Clone + Debug + Hash {}
+pub trait ConsensusValueT: Eq + Clone + Debug + Hash + Serialize + DeserializeOwned {}
+impl<CV> ConsensusValueT for CV where CV: Eq + Clone + Debug + Hash + Serialize + DeserializeOwned {}
 
 /// A hash, as an identifier for a block or vote.
-pub trait HashT: Eq + Ord + Clone + Debug + Hash {}
-impl<H> HashT for H where H: Eq + Ord + Clone + Debug + Hash {}
+pub trait HashT: Eq + Ord + Clone + Debug + Hash + Serialize + DeserializeOwned {}
+impl<H> HashT for H where H: Eq + Ord + Clone + Debug + Hash + Serialize + DeserializeOwned {}
 
 /// A validator's secret signing key.
 pub trait ValidatorSecret: Debug {
@@ -30,7 +32,9 @@ pub trait Context: Clone + Debug + PartialEq {
     /// A validator's secret signing key.
     type ValidatorSecret: ValidatorSecret;
     /// Unique identifiers for votes.
-    type VoteHash: HashT;
+    type Hash: HashT;
     /// The ID of a consensus protocol instance.
     type InstanceId: HashT;
+
+    fn hash(data: &[u8]) -> Self::Hash;
 }
