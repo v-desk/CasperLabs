@@ -150,6 +150,7 @@ class NodeRuntime private[node] (
         storage: SQLiteStorage.CombinedStorage[Task]
       ) <- Resource.liftF(
             SQLiteStorage.create[Task](
+              dagStorageChunkSize = conf.blockstorage.dagStreamChunkSize,
               deployStorageChunkSize = conf.blockstorage.deployStreamChunkSize,
               tickUnit = TimeUnit.MILLISECONDS,
               readXa = readTransactor,
@@ -351,7 +352,7 @@ class NodeRuntime private[node] (
             conf.server.shutdownTimeout,
             ingressScheduler,
             maybeApiSslContext,
-            maybeValidatorId.isEmpty
+            isDeployEnabled = maybeValidatorId.nonEmpty || conf.server.deployGossipEnabled
           )
 
       _ <- api.Servers.httpServerR[Task](
