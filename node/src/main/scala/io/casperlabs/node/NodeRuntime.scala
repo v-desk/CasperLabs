@@ -154,6 +154,7 @@ class NodeRuntime private[node] (
         storage: SQLiteStorage.CombinedStorage[Task]
       ) <- Resource.liftF(
             SQLiteStorage.create[Task](
+              dagStorageChunkSize = conf.blockstorage.dagStreamChunkSize,
               deployStorageChunkSize = conf.blockstorage.deployStreamChunkSize,
               tickUnit = TimeUnit.MILLISECONDS,
               readXa = readTransactor,
