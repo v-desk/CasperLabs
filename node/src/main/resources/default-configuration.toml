@@ -133,6 +133,9 @@ download-retry-backoff-factor = 2.0
 # Try downloading blocks without deploys in them first, fetching the missing deploys as a separate step.
 download-partial-blocks = true
 
+# How long to remember having recently downloaded an item.
+download-cache-expiry = "1hour"
+
 # Maximum number of parallel block downloads allowed to peers.
 relay-max-parallel-blocks = 5
 
@@ -195,7 +198,10 @@ cache-neighborhood-before = 5
 cache-neighborhood-after = 6
 
 # How many records to pull from the DB in a chunk of a stream.
-deploy-stream-chunk-size = 20
+deploy-stream-chunk-size = 10
+
+# How many records or rank ranges to pull from the DB in a chunk of a stream.
+dag-stream-chunk-size = 10
 
 # io.casperlabs.node.configuration.Configuration.GrpcServer
 [grpc]
