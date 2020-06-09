@@ -102,6 +102,7 @@ class ConfigurationSpec
       downloadRetryInitialBackoffPeriod = FiniteDuration(1, TimeUnit.SECONDS),
       downloadRetryBackoffFactor = 1.0,
       downloadPartialBlocks = false,
+      downloadCacheExpiry = FiniteDuration(1, TimeUnit.SECONDS),
       relayMaxParallelBlocks = 1,
       relayBlockChunkConsumerTimeout = FiniteDuration(1, TimeUnit.SECONDS),
       validateMaxParallelBlocks = 1,
@@ -158,7 +159,8 @@ class ConfigurationSpec
       cacheMaxSizeBytes = 1,
       cacheNeighborhoodBefore = 1,
       cacheNeighborhoodAfter = 1,
-      deployStreamChunkSize = 1
+      deployStreamChunkSize = 1,
+      dagStreamChunkSize = 1
     )
     val kamonSettings = Configuration.Kamon(
       prometheus = false,
