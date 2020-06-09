@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::identity, iter, ops::Mul};
+use std::{cmp::Ordering, collections::HashMap, convert::identity, iter, ops::Mul};
 
 use derive_more::{Add, AddAssign, Sub, SubAssign, Sum};
 use displaydoc::Display;
@@ -107,6 +107,11 @@ impl<C: Context> State<C> {
     /// Returns whether evidence against validator nr. `idx` is known.
     pub fn has_evidence(&self, idx: ValidatorIndex) -> bool {
         self.evidence.contains_key(&idx)
+    }
+
+    /// Returns an iterator over all faulty validators against which we have evidence.
+    pub fn faulty_validators<'a>(&'a self) -> impl Iterator<Item = ValidatorIndex> + 'a {
+        self.evidence.keys().cloned()
     }
 
     /// Returns the vote with the given hash, if present.
@@ -252,6 +257,19 @@ impl<C: Context> State<C> {
         self.find_ancestor(&block.skip_idx[i], height)
     }
 
+    /// Merge two panoramas into a new one.
+    pub fn merge_panoramas(&self, pan0: &Panorama<C>, pan1: &Panorama<C>) -> Panorama<C> {
+        let merge_obs = |observations: (&Observation<C>, &Observation<C>)| match observations {
+            (Observation::Faulty, _) | (_, Observation::Faulty) => Observation::Faulty,
+            (Observation::None, obs) | (obs, Observation::None) => obs.clone(),
+            (obs0, Observation::Correct(vh1)) if self.sees_correct(pan0, vh1) => obs0.clone(),
+            (Observation::Correct(vh0), obs1) if self.sees_correct(pan1, vh0) => obs1.clone(),
+            (Observation::Correct(_), Observation::Correct(_)) => Observation::Faulty,
+        };
+        let observations = pan0.iter().zip(&pan1.0).map(merge_obs).collect();
+        Panorama(observations)
+    }
+
     /// Returns an error if `wvote` is invalid.
     fn validate_vote(&self, wvote: &WireVote<C>) -> Result<(), VoteError> {
         let sender = wvote.sender;
@@ -279,6 +297,8 @@ impl<C: Context> State<C> {
     /// If the new vote is valid, it will just add `Observation::Correct(wvote.hash())` to the
     /// panorama. If it represents an equivocation, it adds `Observation::Faulty` and updates
     /// `self.evidence`.
+    ///
+    /// Panics unless all dependencies of `wvote` have already been added to `self`.
     fn update_panorama(&mut self, wvote: &WireVote<C>) {
         let sender = wvote.sender;
         let new_obs = match (self.panorama.get(sender), wvote.panorama.get(sender)) {
@@ -287,7 +307,7 @@ impl<C: Context> State<C> {
             (Observation::None, _) => panic!("missing own previous vote"),
             (Observation::Correct(hash0), _) => {
                 if !self.has_evidence(sender) {
-                    let prev0 = self.find_in_swimlane(hash0, wvote.seq_number);
+                    let prev0 = self.find_in_swimlane(hash0, wvote.seq_number).unwrap();
                     let wvote0 = self.wire_vote(prev0).unwrap();
                     self.add_evidence(Evidence::Equivocation(wvote0, wvote.clone()));
                 }
@@ -297,19 +317,21 @@ impl<C: Context> State<C> {
         self.panorama.update(wvote.sender, new_obs);
     }
 
-    /// Returns the hash of the message with the given sequence number from the sender of `hash`.
-    /// Panics if the sequence number is higher than that of the vote with `hash`.
-    fn find_in_swimlane<'a>(&'a self, hash: &'a C::Hash, seq_number: u64) -> &'a C::Hash {
+    /// Returns the hash of the message with the given sequence number from the sender of `hash`,
+    /// or `None` if the sequence number is higher than that of the vote with `hash`.
+    fn find_in_swimlane<'a>(&'a self, hash: &'a C::Hash, seq_number: u64) -> Option<&'a C::Hash> {
         let vote = self.vote(hash);
-        if vote.seq_number == seq_number {
-            return hash;
+        match vote.seq_number.cmp(&seq_number) {
+            Ordering::Equal => Some(hash),
+            Ordering::Less => None,
+            Ordering::Greater => {
+                let diff = vote.seq_number - seq_number;
+                // We want to make the greatest step 2^i such that 2^i <= diff.
+                let max_i = log2(diff) as usize;
+                let i = max_i.min(vote.skip_idx.len() - 1);
+                self.find_in_swimlane(&vote.skip_idx[i], seq_number)
+            }
         }
-        assert!(vote.seq_number > seq_number);
-        let diff = vote.seq_number - seq_number;
-        // We want to make the greatest step 2^i such that 2^i <= diff.
-        let max_i = log2(diff) as usize;
-        let i = max_i.min(vote.skip_idx.len() - 1);
-        self.find_in_swimlane(&vote.skip_idx[i], seq_number)
     }
 
     /// Returns an iterator over votes (with hashes) by the same sender, in reverse chronological
@@ -324,6 +346,14 @@ impl<C: Context> State<C> {
             let vote = self.vote(current);
             next = vote.previous();
             Some((current, vote))
+        })
+    }
+
+    /// Returns `true` if `pan` sees the sender of `hash` as correct, and sees that vote.
+    pub fn sees_correct(&self, pan: &Panorama<C>, hash: &C::Hash) -> bool {
+        let vote = self.vote(hash);
+        pan.get(vote.sender).correct().map_or(false, |latest_hash| {
+            Some(hash) == self.find_in_swimlane(latest_hash, vote.seq_number)
         })
     }
 
@@ -346,14 +376,6 @@ impl<C: Context> State<C> {
     fn panorama_geq(&self, pan_l: &Panorama<C>, pan_r: &Panorama<C>) -> bool {
         let mut pairs_iter = pan_l.0.iter().zip(&pan_r.0);
         pairs_iter.all(|(obs_l, obs_r)| self.obs_geq(obs_l, obs_r))
-    }
-
-    /// Returns `true` if `pan` sees the sender of `hash` as correct, and sees that vote.
-    fn sees_correct(&self, pan: &Panorama<C>, hash: &C::Hash) -> bool {
-        let vote = self.vote(hash);
-        pan.get(vote.sender).correct().map_or(false, |latest_hash| {
-            hash == self.find_in_swimlane(latest_hash, vote.seq_number)
-        })
     }
 
     /// Returns whether `obs_l` can come later in time than `obs_r`.
@@ -411,7 +433,7 @@ pub mod tests {
     pub struct TestContext;
 
     #[derive(Debug)]
-    pub struct TestSecret(u64);
+    pub struct TestSecret(pub u64);
 
     impl ValidatorSecret for TestSecret {
         type Signature = u64;
@@ -422,7 +444,7 @@ pub mod tests {
     }
 
     impl Context for TestContext {
-        type ConsensusValue = u16;
+        type ConsensusValue = u32;
         type ValidatorId = &'static str;
         type ValidatorSecret = TestSecret;
         type Hash = u64;
@@ -510,7 +532,7 @@ pub mod tests {
         // The predecessor with sequence number i should always equal a[i].
         for j in (a.len() - 2)..a.len() {
             for i in 0..j {
-                assert_eq!(&a[i], state.find_in_swimlane(&a[j], i as u64));
+                assert_eq!(Some(&a[i]), state.find_in_swimlane(&a[j], i as u64));
             }
         }
 
