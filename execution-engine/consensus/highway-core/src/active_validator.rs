@@ -97,8 +97,8 @@ impl<C: Context> ActiveValidator<C> {
     pub fn on_new_vote(&self, vhash: &C::Hash, instant: u64, state: &State<C>) -> Vec<Effect<C>> {
         if self.should_send_confirmation(vhash, instant, state) {
             let panorama = self.confirmation_panorama(vhash, state);
-            let witness_vote = self.new_vote(panorama, instant, None, state);
-            vec![Effect::NewVertex(Vertex::Vote(witness_vote))]
+            let confirmation_vote = self.new_vote(panorama, instant, None, state);
+            vec![Effect::NewVertex(Vertex::Vote(confirmation_vote))]
         } else {
             vec![]
         }
@@ -113,8 +113,8 @@ impl<C: Context> ActiveValidator<C> {
     ) -> Vec<Effect<C>> {
         let panorama = state.panorama().clone();
         let instant = block_context.instant();
-        let witness_vote = self.new_vote(panorama, instant, Some(values), state);
-        vec![Effect::NewVertex(Vertex::Vote(witness_vote))]
+        let proposal_vote = self.new_vote(panorama, instant, Some(values), state);
+        vec![Effect::NewVertex(Vertex::Vote(proposal_vote))]
     }
 
     /// Returns whether the incoming message is a proposal that we need to send a confirmation for.
