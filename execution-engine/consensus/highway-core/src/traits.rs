@@ -16,9 +16,11 @@ impl<H> HashT for H where H: Eq + Ord + Clone + Debug + Hash + Serialize + Deser
 
 /// A validator's secret signing key.
 pub trait ValidatorSecret: Debug {
-    type Signature: Eq + Clone + Debug + Hash;
+    type Hash;
 
-    fn sign(&self, data: &[u8]) -> Vec<u8>;
+    type Signature: Eq + Clone + Debug + Hash + Serialize + DeserializeOwned;
+
+    fn sign(&self, data: &Self::Hash) -> Self::Signature;
 }
 
 /// The collection of types the user can choose for cryptography, IDs, transactions, etc.
@@ -30,7 +32,7 @@ pub trait Context: Clone + Debug + PartialEq {
     /// Unique identifiers for validators.
     type ValidatorId: ValidatorIdT;
     /// A validator's secret signing key.
-    type ValidatorSecret: ValidatorSecret;
+    type ValidatorSecret: ValidatorSecret<Hash = Self::Hash>;
     /// Unique identifiers for votes.
     type Hash: HashT;
     /// The ID of a consensus protocol instance.

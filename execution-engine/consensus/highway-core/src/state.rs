@@ -436,9 +436,10 @@ pub mod tests {
     pub struct TestSecret(pub u64);
 
     impl ValidatorSecret for TestSecret {
+        type Hash = u64;
         type Signature = u64;
 
-        fn sign(&self, _data: &[u8]) -> Vec<u8> {
+        fn sign(&self, _data: &Self::Hash) -> Self::Signature {
             unimplemented!()
         }
     }
