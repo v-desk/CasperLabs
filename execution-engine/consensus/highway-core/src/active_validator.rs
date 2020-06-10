@@ -2,7 +2,7 @@ use crate::{
     state::State,
     traits::Context,
     validators::ValidatorIndex,
-    vertex::{Vertex, WireVote},
+    vertex::{SignedWireVote, Vertex, WireVote},
     vote::{Observation, Panorama},
 };
 
@@ -50,7 +50,7 @@ pub struct ActiveValidator<C: Context> {
     vidx: ValidatorIndex,
     /// The validator's secret signing key.
     // TODO: Sign votes.
-    _secret: C::ValidatorSecret,
+    secret: C::ValidatorSecret,
     /// The round exponent: Our subjective rounds are `1 << round_exp` milliseconds long.
     round_exp: u8,
     /// The latest timer we scheduled.
@@ -68,7 +68,7 @@ impl<C: Context> ActiveValidator<C> {
     ) -> (Self, Vec<Effect<C>>) {
         let mut av = ActiveValidator {
             vidx,
-            _secret: secret,
+            secret: secret,
             round_exp,
             next_timer: 0,
         };
@@ -158,16 +158,17 @@ impl<C: Context> ActiveValidator<C> {
         instant: u64,
         values: Option<Vec<C::ConsensusValue>>,
         state: &State<C>,
-    ) -> WireVote<C> {
+    ) -> SignedWireVote<C> {
         let add1 = |vh: &C::Hash| state.vote(vh).seq_number + 1;
         let seq_number = panorama.get(self.vidx).correct().map_or(0, add1);
-        WireVote {
+        let wvote = WireVote {
             panorama,
             sender: self.vidx,
             values,
             seq_number,
             instant,
-        }
+        };
+        SignedWireVote::new(wvote, &self.secret)
     }
 
     /// Returns a `ScheduleTimer` effect for the next time we need to be called.
@@ -212,9 +213,9 @@ mod tests {
     type Eff = Effect<TestContext>;
 
     impl Eff {
-        fn unwrap_vote(self) -> WireVote<TestContext> {
-            if let Eff::NewVertex(Vertex::Vote(wvote)) = self {
-                wvote
+        fn unwrap_vote(self) -> SignedWireVote<TestContext> {
+            if let Eff::NewVertex(Vertex::Vote(swvote)) = self {
+                swvote
             } else {
                 panic!("Unexpected effect: {:?}", self);
             }

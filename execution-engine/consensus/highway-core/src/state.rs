@@ -12,7 +12,7 @@ use crate::{
     tallies::Tallies,
     traits::Context,
     validators::ValidatorIndex,
-    vertex::{Dependency, WireVote},
+    vertex::{Dependency, SignedWireVote, WireVote},
     vote::{Observation, Panorama, Vote},
 };
 
@@ -35,7 +35,7 @@ impl Mul<u64> for Weight {
 #[error("{:?}", .cause)]
 pub struct AddVoteError<C: Context> {
     /// The invalid vote that was not added to the protocol state.
-    pub wvote: WireVote<C>,
+    pub swvote: SignedWireVote<C>,
     /// The reason the vote is invalid.
     #[source]
     pub cause: VoteError,
@@ -49,9 +49,12 @@ pub enum VoteError {
     SequenceNumber,
 }
 
-impl<C: Context> WireVote<C> {
+impl<C: Context> SignedWireVote<C> {
     fn with_error(self, cause: VoteError) -> AddVoteError<C> {
-        AddVoteError { wvote: self, cause }
+        AddVoteError {
+            swvote: self,
+            cause,
+        }
     }
 }
 
@@ -175,14 +178,15 @@ impl<C: Context> State<C> {
 
     /// Adds the vote to the protocol state, or returns an error if it is invalid.
     /// Panics if dependencies are not satisfied.
-    pub fn add_vote(&mut self, wvote: WireVote<C>) -> Result<(), AddVoteError<C>> {
-        if let Err(err) = self.validate_vote(&wvote) {
-            return Err(wvote.with_error(err));
+    pub fn add_vote(&mut self, swvote: SignedWireVote<C>) -> Result<(), AddVoteError<C>> {
+        if let Err(err) = self.validate_vote(&swvote) {
+            return Err(swvote.with_error(err));
         }
-        self.update_panorama(&wvote);
+        let wvote = &swvote.wire_vote;
+        self.update_panorama(&swvote);
         let hash = wvote.hash();
         let fork_choice = self.fork_choice(&wvote.panorama).cloned();
-        let (vote, opt_values) = Vote::new(wvote, fork_choice.as_ref(), self);
+        let (vote, opt_values) = Vote::new(swvote, fork_choice.as_ref(), self);
         if let Some(values) = opt_values {
             let block = Block::new(fork_choice, values, self);
             self.blocks.insert(hash.clone(), block);
@@ -196,16 +200,20 @@ impl<C: Context> State<C> {
         self.evidence.insert(idx, evidence);
     }
 
-    pub fn wire_vote(&self, hash: &C::Hash) -> Option<WireVote<C>> {
+    pub fn wire_vote(&self, hash: &C::Hash) -> Option<SignedWireVote<C>> {
         let vote = self.opt_vote(hash)?.clone();
         let opt_block = self.opt_block(hash);
         let values = opt_block.map(|block| block.values.clone());
-        Some(WireVote {
+        let wvote = WireVote {
             panorama: vote.panorama.clone(),
             sender: vote.sender,
             values,
             seq_number: vote.seq_number,
             instant: vote.instant,
+        };
+        Some(SignedWireVote {
+            wire_vote: wvote,
+            signature: vote.signature,
         })
     }
 
@@ -271,7 +279,9 @@ impl<C: Context> State<C> {
     }
 
     /// Returns an error if `wvote` is invalid.
-    fn validate_vote(&self, wvote: &WireVote<C>) -> Result<(), VoteError> {
+    fn validate_vote(&self, swvote: &SignedWireVote<C>) -> Result<(), VoteError> {
+        let wvote = &swvote.wire_vote;
+        // TODO: Validate signature.
         let sender = wvote.sender;
         // TODO: Check instant >= justification instants.
         // Check that the panorama is consistent.
@@ -299,7 +309,8 @@ impl<C: Context> State<C> {
     /// `self.evidence`.
     ///
     /// Panics unless all dependencies of `wvote` have already been added to `self`.
-    fn update_panorama(&mut self, wvote: &WireVote<C>) {
+    fn update_panorama(&mut self, swvote: &SignedWireVote<C>) {
+        let wvote = &swvote.wire_vote;
         let sender = wvote.sender;
         let new_obs = match (self.panorama.get(sender), wvote.panorama.get(sender)) {
             (Observation::Faulty, _) => Observation::Faulty,
@@ -309,7 +320,7 @@ impl<C: Context> State<C> {
                 if !self.has_evidence(sender) {
                     let prev0 = self.find_in_swimlane(hash0, wvote.seq_number).unwrap();
                     let wvote0 = self.wire_vote(prev0).unwrap();
-                    self.add_evidence(Evidence::Equivocation(wvote0, wvote.clone()));
+                    self.add_evidence(Evidence::Equivocation(wvote0, swvote.clone()));
                 }
                 Observation::Faulty
             }
@@ -432,7 +443,7 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq)]
     pub struct TestContext;
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TestSecret(pub u64);
 
     impl ValidatorSecret for TestSecret {
@@ -443,6 +454,10 @@ pub mod tests {
             unimplemented!()
         }
     }
+
+    pub const ALICE_SEC: TestSecret = TestSecret(0);
+    pub const BOB_SEC: TestSecret = TestSecret(0);
+    pub const CAROL_SEC: TestSecret = TestSecret(0);
 
     impl Context for TestContext {
         type ConsensusValue = u32;
@@ -480,18 +495,18 @@ pub mod tests {
         // Bob:   b0 —— b1
         //          \  /
         // Carol:    c0
-        add_vote!(state, a0, ALICE, 0; N, N, N; 0xA);
-        add_vote!(state, b0, BOB, 0; N, N, N; 0xB);
-        add_vote!(state, c0, CAROL, 0; N, b0, N);
-        add_vote!(state, b1, BOB, 1; N, b0, c0);
-        add_vote!(state, _a1, ALICE, 1; a0, b1, c0);
+        add_vote!(state, a0, ALICE, ALICE_SEC, 0; N, N, N; 0xA);
+        add_vote!(state, b0, BOB, BOB_SEC, 0; N, N, N; 0xB);
+        add_vote!(state, c0, CAROL, CAROL_SEC, 0; N, b0, N);
+        add_vote!(state, b1, BOB, BOB_SEC, 1; N, b0, c0);
+        add_vote!(state, _a1, ALICE, ALICE_SEC, 1; a0, b1, c0);
 
         // Wrong sequence number: Carol hasn't produced c1 yet.
-        let vote = vote!(CAROL, 2; N, b1, c0);
+        let vote = vote!(CAROL, CAROL_SEC, 2; N, b1, c0);
         let opt_err = state.add_vote(vote).err().map(vote_err);
         assert_eq!(Some(VoteError::SequenceNumber), opt_err);
         // Inconsistent panorama: If you see b1, you have to see c0, too.
-        let vote = vote!(CAROL, 1; N, b1, N);
+        let vote = vote!(CAROL, CAROL_SEC, 1; N, b1, N);
         let opt_err = state.add_vote(vote).err().map(vote_err);
         assert_eq!(Some(VoteError::Panorama), opt_err);
 
@@ -502,7 +517,7 @@ pub mod tests {
         assert_eq!(Some(Dependency::Vote(42)), missing);
 
         // Alice equivocates: A1 doesn't see a1.
-        add_vote!(state, ae1, ALICE, 1; a0, b1, c0);
+        add_vote!(state, ae1, ALICE, ALICE_SEC, 1; a0, b1, c0);
         assert!(state.has_evidence(ALICE));
 
         let missing = state.missing_dependency(&panorama!(F, b1, c0));
@@ -511,7 +526,7 @@ pub mod tests {
         assert_eq!(None, missing);
 
         // Bob can see the equivocation.
-        add_vote!(state, b2, BOB, 2; F, b1, c0);
+        add_vote!(state, b2, BOB, BOB_SEC, 2; F, b1, c0);
 
         // The state's own panorama has been updated correctly.
         assert_eq!(state.panorama, panorama!(F, b2, c0));
@@ -522,11 +537,11 @@ pub mod tests {
     fn find_in_swimlane() -> Result<(), AddVoteError<TestContext>> {
         let mut state = State::new(WEIGHTS, 0);
         let mut a = Vec::new();
-        let vote = vote!(ALICE, 0; N, N, N; Some(vec![0xA]));
+        let vote = vote!(ALICE, ALICE_SEC, 0; N, N, N; Some(vec![0xA]));
         a.push(vote.hash());
         state.add_vote(vote)?;
         for i in 1..10 {
-            add_vote!(state, ai, ALICE, i as u64; a[i - 1], N, N);
+            add_vote!(state, ai, ALICE, ALICE_SEC, i as u64; a[i - 1], N, N);
             a.push(ai);
         }
 
@@ -557,13 +572,13 @@ pub mod tests {
         // b0: 12           b2: 4
         //        \
         //          c0: 5 — c1: 5
-        add_vote!(state, b0, BOB, 0; N, N, N; 0xB0);
-        add_vote!(state, c0, CAROL, 0; N, b0, N; 0xC0);
-        add_vote!(state, c1, CAROL, 1; N, b0, c0; 0xC1);
-        add_vote!(state, a0, ALICE, 0; N, b0, N; 0xA0);
-        add_vote!(state, b1, BOB, 1; a0, b0, N); // Just a ballot; not shown above.
-        add_vote!(state, a1, ALICE, 1; a0, b1, c1; 0xA1);
-        add_vote!(state, b2, BOB, 2; a0, b1, N; 0xB2);
+        add_vote!(state, b0, BOB, BOB_SEC, 0; N, N, N; 0xB0);
+        add_vote!(state, c0, CAROL, CAROL_SEC, 0; N, b0, N; 0xC0);
+        add_vote!(state, c1, CAROL, CAROL_SEC, 1; N, b0, c0; 0xC1);
+        add_vote!(state, a0, ALICE, ALICE_SEC, 0; N, b0, N; 0xA0);
+        add_vote!(state, b1, BOB, BOB_SEC, 1; a0, b0, N); // Just a ballot; not shown above.
+        add_vote!(state, a1, ALICE, ALICE_SEC, 1; a0, b1, c1; 0xA1);
+        add_vote!(state, b2, BOB, BOB_SEC, 2; a0, b1, N; 0xB2);
 
         // Alice built `a1` on top of `a0`, which had already 7 points.
         assert_eq!(Some(&a0), state.block(&state.vote(&a1).block).parent());
