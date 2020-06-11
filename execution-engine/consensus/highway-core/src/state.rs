@@ -442,25 +442,25 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq)]
     pub struct TestContext;
 
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TestSecret(pub u64);
+    #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+    pub struct TestSecret(pub u32);
 
     impl ValidatorSecret for TestSecret {
         type Hash = u64;
         type Signature = u64;
 
         fn sign(&self, data: &Self::Hash) -> Self::Signature {
-            unimplemented!()
+            data + u64::from(self.0)
         }
     }
 
     pub const ALICE_SEC: TestSecret = TestSecret(0);
-    pub const BOB_SEC: TestSecret = TestSecret(0);
-    pub const CAROL_SEC: TestSecret = TestSecret(0);
+    pub const BOB_SEC: TestSecret = TestSecret(1);
+    pub const CAROL_SEC: TestSecret = TestSecret(2);
 
     impl Context for TestContext {
         type ConsensusValue = u32;
-        type ValidatorId = &'static str;
+        type ValidatorId = u32;
         type ValidatorSecret = TestSecret;
         type Hash = u64;
         type InstanceId = u64;
@@ -473,9 +473,11 @@ pub mod tests {
 
         fn validate_signature(
             hash: &Self::Hash,
+            public_key: &Self::ValidatorId,
             signature: &<Self::ValidatorSecret as ValidatorSecret>::Signature,
         ) -> bool {
-            unimplemented!()
+            let computed_signature = hash + u64::from(*public_key);
+            computed_signature == *signature
         }
     }
 
