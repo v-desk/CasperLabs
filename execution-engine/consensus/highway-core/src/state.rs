@@ -281,7 +281,6 @@ impl<C: Context> State<C> {
     /// Returns an error if `wvote` is invalid.
     fn validate_vote(&self, swvote: &SignedWireVote<C>) -> Result<(), VoteError> {
         let wvote = &swvote.wire_vote;
-        // TODO: Validate signature.
         let sender = wvote.sender;
         // TODO: Check instant >= justification instants.
         // Check that the panorama is consistent.
@@ -450,7 +449,7 @@ pub mod tests {
         type Hash = u64;
         type Signature = u64;
 
-        fn sign(&self, _data: &Self::Hash) -> Self::Signature {
+        fn sign(&self, data: &Self::Hash) -> Self::Signature {
             unimplemented!()
         }
     }
@@ -470,6 +469,13 @@ pub mod tests {
             let mut hasher = DefaultHasher::new();
             hasher.write(data);
             hasher.finish()
+        }
+
+        fn validate_signature(
+            hash: &Self::Hash,
+            signature: &<Self::ValidatorSecret as ValidatorSecret>::Signature,
+        ) -> bool {
+            unimplemented!()
         }
     }
 
