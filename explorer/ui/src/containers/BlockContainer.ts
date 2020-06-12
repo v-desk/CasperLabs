@@ -17,16 +17,14 @@ export class BlockContainer {
   @observable depth = 10;
   @observable hideBallotsToggleStore: ToggleStore = new ToggleStore(false);
   @observable deploys: Block.ProcessedDeploy[] | null = null;
-  @observable balances: ObservableValueMap<
-    AccountB16,
-    number
-  > = new ObservableValueMap();
+  @observable
+  balances: ObservableValueMap<AccountB16, number> = new ObservableValueMap();
 
   constructor(
     private errors: ErrorContainer,
     private casperService: CasperService,
     private balanceService: BalanceService
-  ) { }
+  ) {}
 
   /** Call whenever the page switches to a new block. */
   @action
@@ -38,16 +36,19 @@ export class BlockContainer {
     this.balances.clear();
   }
 
-  @computed get blockHashBase16() {
+  @computed
+  get blockHashBase16() {
     return this.blockHash && encodeBase16(this.blockHash);
   }
 
   async loadBlock() {
     if (this.blockHash == null) return;
     await this.errors.capture(
-      this.casperService.getBlockInfo(this.blockHash, BlockInfo.View.FULL).then(block => {
-        this.block = block;
-      })
+      this.casperService
+        .getBlockInfo(this.blockHash, BlockInfo.View.FULL)
+        .then(block => {
+          this.block = block;
+        })
     );
   }
 

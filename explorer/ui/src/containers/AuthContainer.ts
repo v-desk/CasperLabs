@@ -25,7 +25,8 @@ export class AuthContainer {
   @observable private contracts: Contracts | null = null;
 
   // An account we are creating or importing, while we're configuring it.
-  @observable accountForm: NewAccountFormData | ImportAccountFormData | null = null;
+  @observable
+  accountForm: NewAccountFormData | ImportAccountFormData | null = null;
   @observable selectedAccount: UserAccount | null = null;
 
   // Balance for each public key.
@@ -173,8 +174,8 @@ export class AuthContainer {
     await this.errors.capture(this.saveMetaData());
   }
 
-  public getContracts<K extends keyof Contracts>(key:K): Contracts[K] {
-    if(!this.contracts){
+  public getContracts<K extends keyof Contracts>(key: K): Contracts[K] {
+    if (!this.contracts) {
       this.contracts = {};
     }
     return this.contracts[key];
@@ -210,8 +211,8 @@ function saveToFile(content: string, filename: string) {
 }
 
 class AccountFormData extends CleanableFormData {
-  name: FieldState<string> = new FieldState<string>("");
-  publicKeyBase64: FieldState<string> = new FieldState("");
+  name: FieldState<string> = new FieldState<string>('');
+  publicKeyBase64: FieldState<string> = new FieldState('');
 
   constructor(private accounts: UserAccount[]) {
     super();

@@ -8,7 +8,8 @@ import {
   Button,
   CommandLineHint,
   Icon,
-  Card, FailIcon
+  Card,
+  FailIcon
 } from './Utils';
 import DataTable from './DataTable';
 import { DeployInfo } from 'casperlabs-grpc/io/casperlabs/casper/consensus/info_pb';
@@ -74,7 +75,8 @@ const FaucetForm = observer(
             label="Public Key (Base16)"
             fieldState={
               (auth.selectedAccount &&
-                base64to16(auth.selectedAccount.publicKeyBase64)) || ''
+                base64to16(auth.selectedAccount.publicKeyBase64)) ||
+              ''
             }
             readonly={true}
           />
@@ -118,24 +120,24 @@ const StatusTable = observer(
     onRefresh: () => void;
     lastRefresh?: Date;
   }) => (
-      <DataTable
-        title="Recent Faucet Requests"
-        refresh={() => props.onRefresh()}
-        rows={props.requests}
-        headers={['Timestamp', 'Account', 'Deploy Hash', 'Status']}
-        renderRow={(request: FaucetRequest, idx: number) => {
-          return (
-            <tr key={idx}>
-              <td>{request.timestamp.toLocaleString()}</td>
-              <td>{request.account.name}</td>
-              <td>{encodeBase16(request.deployHash)}</td>
-              <StatusCell request={request} />
-            </tr>
-          );
-        }}
-        footerMessage={<span>Wait until the deploy is included in a block.</span>}
-      />
-    )
+    <DataTable
+      title="Recent Faucet Requests"
+      refresh={() => props.onRefresh()}
+      rows={props.requests}
+      headers={['Timestamp', 'Account', 'Deploy Hash', 'Status']}
+      renderRow={(request: FaucetRequest, idx: number) => {
+        return (
+          <tr key={idx}>
+            <td>{request.timestamp.toLocaleString()}</td>
+            <td>{request.account.name}</td>
+            <td>{encodeBase16(request.deployHash)}</td>
+            <StatusCell request={request} />
+          </tr>
+        );
+      }}
+      footerMessage={<span>Wait until the deploy is included in a block.</span>}
+    />
+  )
 );
 
 const StatusCell = observer((props: { request: FaucetRequest }) => {
@@ -160,10 +162,10 @@ const StatusCell = observer((props: { request: FaucetRequest }) => {
           errm === 'Exit code: 1'
             ? '. It looks like you already funded this account!'
             : errm === 'Exit code: 2'
-              ? '. It looks like the faucet ran out of funds!'
-              : '';
+            ? '. It looks like the faucet ran out of funds!'
+            : '';
         return [
-          <FailIcon/>,
+          <FailIcon />,
           `Failed in block ${blockHash(failure)}: ${errm + hint}`
         ];
       }

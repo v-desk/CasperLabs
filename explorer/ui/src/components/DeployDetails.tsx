@@ -5,7 +5,13 @@ import { DeployContainer } from '../containers/DeployContainer';
 import DataTable from './DataTable';
 import { DeployInfo } from 'casperlabs-grpc/io/casperlabs/casper/consensus/info_pb';
 import Pages from './Pages';
-import { RefreshableComponent, Icon, shortHash, FailIcon, SuccessIcon } from './Utils';
+import {
+  RefreshableComponent,
+  Icon,
+  shortHash,
+  FailIcon,
+  SuccessIcon
+} from './Utils';
 import ObservableValueMap from '../lib/ObservableValueMap';
 import { Balance, FinalityIcon } from './BlockDetails';
 import { decodeBase16, encodeBase16 } from 'casperlabs-sdk';
@@ -126,11 +132,7 @@ const ResultsTable = observer(
                 <Balance balance={props.balances.get(id)} />
               </td>
               <td className="text-center">
-                {proc.getIsError() ? (
-                  <FailIcon/>
-                ) : (
-                  <SuccessIcon/>
-                  )}
+                {proc.getIsError() ? <FailIcon /> : <SuccessIcon />}
               </td>
               <td>{proc.getErrorMessage()}</td>
             </tr>

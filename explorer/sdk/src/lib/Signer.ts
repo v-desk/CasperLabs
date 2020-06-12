@@ -14,7 +14,9 @@ export const isConnected: () => boolean = () => {
  * returns base64 encoded public key of user current selected account.
  * @throws Error if haven't connected to CasperLabs Signer browser plugin.
  */
-export const getSelectedPublicKeyBase64: () => Promise<string | undefined> = () => {
+export const getSelectedPublicKeyBase64: () => Promise<
+  string | undefined
+> = () => {
   throwIfNotConnected();
   return window.casperlabsHelper!.getSelectedPublicKeyBase64();
 };
@@ -23,13 +25,17 @@ export const getSelectedPublicKeyBase64: () => Promise<string | undefined> = () 
  * send base16 encoded message to plugin to sign
  * @throws Error if haven't connected to CasperLabs Signer browser plugin.
  */
-export const sign: (messageBase16: string) => Promise<string> = (messageBase16: string) => {
+export const sign: (messageBase16: string) => Promise<string> = (
+  messageBase16: string
+) => {
   throwIfNotConnected();
   return window.casperlabsHelper!.sign(messageBase16);
 };
 
 const throwIfNotConnected = () => {
   if (!isConnected()) {
-    throw new Error('No CasperLabs Signer browser plugin detected or it is not ready');
+    throw new Error(
+      'No CasperLabs Signer browser plugin detected or it is not ready'
+    );
   }
 };

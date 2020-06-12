@@ -1,7 +1,10 @@
 import React from 'react';
 import { observer } from 'mobx-react';
 
-import AuthContainer, { ImportAccountFormData, NewAccountFormData } from '../containers/AuthContainer';
+import AuthContainer, {
+  ImportAccountFormData,
+  NewAccountFormData
+} from '../containers/AuthContainer';
 import { Button, IconButton, ListInline, RefreshableComponent } from './Utils';
 import Modal from './Modal';
 import { FileSelect, Form, TextField } from './Forms';
@@ -72,49 +75,49 @@ export default class Accounts extends RefreshableComponent<Props, {}> {
           </Form>
         </Modal>
       );
-    } else if(accountForm instanceof ImportAccountFormData) {
+    } else if (accountForm instanceof ImportAccountFormData) {
       // Help IDE infer that the type of accountForm is ImportAccountFormData
       let importAccountForm = accountForm;
       modalAccountForm = (
-          <Modal
-            id="import-account"
-            title="Import Account Public Key"
-            submitLabel="Save"
-            onSubmit={() => this.props.auth.importAccount()}
-            onClose={() => {
-              this.props.auth.accountForm = null;
-            }}
-            error={importAccountForm.error}
-          >
-            <Form>
-              <FileSelect
-                id="id-file-select"
-                label={importAccountForm.fileName || 'Choose Public Key File'}
-                handleFileSelect={e => {
-                  importAccountForm.handleFileSelect(e);
-                }}
-              />
-              <TextField
-                id="id-account-name"
-                label="Name"
-                fieldState={importAccountForm.name}
-                placeholder="Human readable alias"
-              />
-              <TextField
-                id="id-public-key-base64"
-                label="Public Key (Base64)"
-                fieldState={importAccountForm.publicKeyBase64}
-                readonly={true}
-              />
-              <TextField
-                id="id-public-key-base16"
-                label="Public Key (Base16)"
-                fieldState={base64to16(importAccountForm.publicKeyBase64.value)}
-                readonly={true}
-              />
-            </Form>
-          </Modal>
-        );
+        <Modal
+          id="import-account"
+          title="Import Account Public Key"
+          submitLabel="Save"
+          onSubmit={() => this.props.auth.importAccount()}
+          onClose={() => {
+            this.props.auth.accountForm = null;
+          }}
+          error={importAccountForm.error}
+        >
+          <Form>
+            <FileSelect
+              id="id-file-select"
+              label={importAccountForm.fileName || 'Choose Public Key File'}
+              handleFileSelect={e => {
+                importAccountForm.handleFileSelect(e);
+              }}
+            />
+            <TextField
+              id="id-account-name"
+              label="Name"
+              fieldState={importAccountForm.name}
+              placeholder="Human readable alias"
+            />
+            <TextField
+              id="id-public-key-base64"
+              label="Public Key (Base64)"
+              fieldState={importAccountForm.publicKeyBase64}
+              readonly={true}
+            />
+            <TextField
+              id="id-public-key-base16"
+              label="Public Key (Base16)"
+              fieldState={base64to16(importAccountForm.publicKeyBase64.value)}
+              readonly={true}
+            />
+          </Form>
+        </Modal>
+      );
     }
     return (
       <div>
@@ -122,12 +125,7 @@ export default class Accounts extends RefreshableComponent<Props, {}> {
           title="Accounts"
           refresh={() => this.refresh(true)}
           rows={this.props.auth.accounts}
-          headers={[
-            'Name',
-            'Public Key (Base16)',
-            'Balance',
-            ''
-          ]}
+          headers={['Name', 'Public Key (Base16)', 'Balance', '']}
           renderRow={(account: UserAccount) => {
             const balance = this.props.auth.balances.get(
               account.publicKeyBase64
@@ -137,7 +135,7 @@ export default class Accounts extends RefreshableComponent<Props, {}> {
                 <td>{account.name}</td>
                 <td>{base64to16(account.publicKeyBase64)}</td>
                 <td>
-                  <Balance balance={balance}/>
+                  <Balance balance={balance} />
                 </td>
                 <td className="text-center">
                   <IconButton

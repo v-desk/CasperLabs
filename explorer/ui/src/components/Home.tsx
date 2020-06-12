@@ -93,7 +93,7 @@ const Card = (props: CardProps) => {
       View Details
     </span>,
     <span key="right" className="float-right">
-      <i className="fa fa-angle-right"></i>
+      <i className="fa fa-angle-right" />
     </span>
   ];
   return (
@@ -101,7 +101,7 @@ const Card = (props: CardProps) => {
       <div className={`card text-white bg-${props.background} o-hidden h-100`}>
         <div className="card-body">
           <div className="card-body-icon">
-            <i className={`fa fa-fw fa-${props.icon}`}></i>
+            <i className={`fa fa-fw fa-${props.icon}`} />
           </div>
           {props.children}
         </div>
@@ -161,11 +161,7 @@ const ExploreCard = (_: {}) => {
 
 const GraphQLCard = (_: {}) => {
   return (
-    <Card
-      background="info"
-      icon="flask"
-      to={window.config.graphql.url}
-    >
+    <Card background="info" icon="flask" to={window.config.graphql.url}>
       <CardMessage message="Try the GraphQL console!" />
     </Card>
   );

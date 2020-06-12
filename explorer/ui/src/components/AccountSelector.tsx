@@ -63,7 +63,7 @@ class _AccountSelector extends React.Component<Props, {}> {
                       className="controller-button"
                       aria-label="clear selection"
                     >
-                      <i className="fas fa-times"></i>
+                      <i className="fas fa-times" />
                     </button>
                   ) : (
                     <button

@@ -1,14 +1,22 @@
-import { action, IObservableArray, observable, reaction, runInAction } from 'mobx';
+import {
+  action,
+  IObservableArray,
+  observable,
+  reaction,
+  runInAction
+} from 'mobx';
 
 import ErrorContainer from './ErrorContainer';
 import { CasperService, encodeBase16 } from 'casperlabs-sdk';
-import { BlockInfo, Event } from 'casperlabs-grpc/io/casperlabs/casper/consensus/info_pb';
+import {
+  BlockInfo,
+  Event
+} from 'casperlabs-grpc/io/casperlabs/casper/consensus/info_pb';
 import { ToggleStore } from '../components/ToggleButton';
 import { ToggleableSubscriber } from './ToggleableSubscriber';
 
 export class DagStep {
-  constructor(private container: DagContainer) {
-  }
+  constructor(private container: DagContainer) {}
 
   private step = (f: () => number) => () => {
     this.maxRank = f();
@@ -44,8 +52,8 @@ export class DagStep {
     this.maxRank === 0 && this.currentMaxRank <= this.depth
       ? 0
       : this.currentMaxRank > this.depth
-        ? this.currentMaxRank - this.depth
-        : this.currentMaxRank
+      ? this.currentMaxRank - this.depth
+      : this.currentMaxRank
   );
 
   next = this.step(() => this.currentMaxRank + this.depth);
@@ -74,7 +82,7 @@ export class DagContainer {
         blockFinalized: true
       },
       this.casperService,
-      (e) => this.subscriberHandler(e),
+      e => this.subscriberHandler(e),
       () => this.isLatestDag,
       () => this.refreshBlockDag()
     );
@@ -136,24 +144,43 @@ export class DagContainer {
 
         if (index === -1) {
           // blocks with rank < maxRank+1-depth will be culled
-          let blockRank = block!.getSummary()!.getHeader()!.getJRank();
-          let oldMaxRank = this.blocks ? this.blocks[0].getSummary()!.getHeader()!.getJRank() : 0;
+          let blockRank = block!
+            .getSummary()!
+            .getHeader()!
+            .getJRank();
+          let oldMaxRank = this.blocks
+            ? this.blocks[0]
+                .getSummary()!
+                .getHeader()!
+                .getJRank()
+            : 0;
           let maxRank = Math.max(oldMaxRank, blockRank);
           let culledThreshold = maxRank + 1 - this.depth;
           if (blockRank >= culledThreshold) {
             // The new block should be added to DAG.
-            let remainingBlocks = this.blocks ? this.blocks.filter(b => {
-              let rank = b.getSummary()?.getHeader()?.getJRank();
-              if (rank !== undefined) {
-                return rank >= culledThreshold;
-              }
-              return false;
-            }) : [];
+            let remainingBlocks = this.blocks
+              ? this.blocks.filter(b => {
+                  let rank = b
+                    .getSummary()
+                    ?.getHeader()
+                    ?.getJRank();
+                  if (rank !== undefined) {
+                    return rank >= culledThreshold;
+                  }
+                  return false;
+                })
+              : [];
             // insert item to an ordered array
             // find first index I so that the newAddedBlock.jRank >= remainingBlocks[i].jRank
             let i = 0;
             for (; i < remainingBlocks.length; i++) {
-              if (blockRank >= remainingBlocks[i].getSummary()!.getHeader()!.getJRank()) {
+              if (
+                blockRank >=
+                remainingBlocks[i]
+                  .getSummary()!
+                  .getHeader()!
+                  .getJRank()
+              ) {
                 break;
               }
             }
@@ -167,7 +194,9 @@ export class DagContainer {
         }
       }
     } else if (event.hasNewFinalizedBlock()) {
-      const directFinalizedBlockHash = event.getNewFinalizedBlock()!.getBlockHash_asB64();
+      const directFinalizedBlockHash = event
+        .getNewFinalizedBlock()!
+        .getBlockHash_asB64();
 
       const orphanedBlocks = new Set(
         event
@@ -196,9 +225,11 @@ export class DagContainer {
       });
       if (!updatedLastFinalizedBlock) {
         this.errors.capture(
-          this.casperService.getBlockInfo(event.getNewFinalizedBlock()!.getBlockHash()).then(block => {
-            this.lastFinalizedBlock = block;
-          })
+          this.casperService
+            .getBlockInfo(event.getNewFinalizedBlock()!.getBlockHash())
+            .then(block => {
+              this.lastFinalizedBlock = block;
+            })
         );
       }
     }

@@ -8,10 +8,8 @@ import ObservableValueMap from '../lib/ObservableValueMap';
 export class DeployContainer {
   @observable deployHash: ByteArray | null = null;
   @observable deploy: DeployInfo | null = null;
-  @observable balances: ObservableValueMap<
-    string,
-    number
-  > = new ObservableValueMap();
+  @observable
+  balances: ObservableValueMap<string, number> = new ObservableValueMap();
 
   constructor(
     private errors: ErrorContainer,
@@ -27,7 +25,8 @@ export class DeployContainer {
     this.balances.clear();
   }
 
-  @computed get deployHashBase16() {
+  @computed
+  get deployHashBase16() {
     return this.deployHash && encodeBase16(this.deployHash);
   }
 

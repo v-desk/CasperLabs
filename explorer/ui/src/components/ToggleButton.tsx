@@ -37,7 +37,7 @@ export class ToggleStore {
 
 export const ToggleButton = observer((props: Props) => (
   <div className="pr-1">
-    {props.label && (<small>{props.label}</small>)}
+    {props.label && <small>{props.label}</small>}
     <button
       type="button"
       className={`btn btn-${props.size} btn-toggle ${props.toggleStore
@@ -45,7 +45,7 @@ export const ToggleButton = observer((props: Props) => (
       onClick={_ => props.toggleStore.toggle()}
       title={props.title}
     >
-      <div className="handle"/>
+      <div className="handle" />
     </button>
   </div>
 ));

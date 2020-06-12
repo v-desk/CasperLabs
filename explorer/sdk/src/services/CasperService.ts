@@ -1,5 +1,8 @@
 import { grpc } from '@improbable-eng/grpc-web';
-import { Block, Deploy } from 'casperlabs-grpc/io/casperlabs/casper/consensus/consensus_pb';
+import {
+  Block,
+  Deploy
+} from 'casperlabs-grpc/io/casperlabs/casper/consensus/consensus_pb';
 import {
   BlockInfo,
   DeployInfo
@@ -52,7 +55,7 @@ export default class CasperService {
         host: this.url,
         request: deployRequest,
 
-        onEnd: (res) => {
+        onEnd: res => {
           if (res.status === grpc.Code.OK) {
             resolve();
           } else {
@@ -232,7 +235,10 @@ export default class CasperService {
     });
   }
 
-  batchGetBlockState(blockHash: BlockHash, querys: StateQuery[]): Promise<StateValue[]> {
+  batchGetBlockState(
+    blockHash: BlockHash,
+    querys: StateQuery[]
+  ): Promise<StateValue[]> {
     return new Promise<StateValue[]>((resolve, reject) => {
       const request = new BatchGetBlockStateRequest();
       request.setBlockHashBase16(encodeBase16(blockHash));
@@ -243,7 +249,9 @@ export default class CasperService {
         request,
         onEnd: res => {
           if (res.status === grpc.Code.OK) {
-            resolve((res.message as BatchGetBlockStateResponse).getValuesList());
+            resolve(
+              (res.message as BatchGetBlockStateResponse).getValuesList()
+            );
           } else {
             reject(new GrpcError(res.status, res.statusMessage));
           }
@@ -281,7 +289,14 @@ export default class CasperService {
       const balanceUref = await this.getBlockState(
         blockHash,
         localKeyQuery
-      ).then(res => res.getClValue()!.getValue()!.getKey()!.getUref()!);
+      ).then(
+        res =>
+          res
+            .getClValue()!
+            .getValue()!
+            .getKey()!
+            .getUref()!
+      );
 
       return balanceUref;
     } catch (err) {
@@ -304,7 +319,11 @@ export default class CasperService {
   ): Promise<number> {
     const balanceQuery = QueryUref(balanceUref);
     const balance = await this.getBlockState(blockHash, balanceQuery).then(
-      res => res.getClValue()!.getValue()!.getU512()!
+      res =>
+        res
+          .getClValue()!
+          .getValue()!
+          .getU512()!
     );
     return Number(balance.getValue());
   }

@@ -47,7 +47,7 @@ class MenuItem {
     public label: string,
     public icon?: string,
     public exact: boolean = false
-  ) { }
+  ) {}
 
   toRoute() {
     return <NavLink item={this} key={this.path} />;
@@ -60,7 +60,7 @@ class GroupedMenuItem {
     public label: string,
     public icon: string,
     public secondLevelChildren: MenuItem[]
-  ) { }
+  ) {}
 
   toRoute() {
     return (
@@ -74,9 +74,7 @@ class GroupedMenuItem {
           aria-controls={this.id}
         >
           <i className={`nav-link-icon fa fa-fw fa-${this.icon}`} />
-          <span className="nav-link-text">
-            {this.label}
-          </span>
+          <span className="nav-link-text">{this.label}</span>
           <div className="sidenav-collapse-arrow">
             <i className="fas fa-angle-down" />
           </div>
@@ -151,7 +149,7 @@ export default class App extends React.Component<AppProps, {}> {
     // })
 
     // Toggle the side navigation
-    $('#sidenavToggler').click(function (e) {
+    $('#sidenavToggler').click(function(e) {
       e.preventDefault();
       $('body').toggleClass('sidenav-toggled');
       $('.navbar-sidenav .nav-link-collapse').addClass('collapsed');
@@ -163,14 +161,14 @@ export default class App extends React.Component<AppProps, {}> {
     // Hide sidenav manually after clicking menu item in mobile view
     // $("#navbarResponsive") is a responsive component which can only collapsed
     // in mobile view.
-    $('.navbar-sidenav .nav-item').click(function (e) {
-      $("#navbarResponsive").collapse('hide');
+    $('.navbar-sidenav .nav-item').click(function(e) {
+      $('#navbarResponsive').collapse('hide');
     });
 
     // Prevent the content wrapper from scrolling when the fixed side navigation hovered over
     $(
       'body.fixed-nav .navbar-sidenav, body.fixed-nav .sidenav-toggler, body.fixed-nav .navbar-collapse'
-    ).on('mousewheel DOMMouseScroll', function (e: any) {
+    ).on('mousewheel DOMMouseScroll', function(e: any) {
       var e0 = e.originalEvent,
         delta = e0.wheelDelta || -e0.detail;
       this.scrollTop += (delta < 0 ? 1 : -1) * 30;
@@ -178,7 +176,7 @@ export default class App extends React.Component<AppProps, {}> {
     });
 
     // Scroll to top button appear
-    $(document).scroll(function () {
+    $(document).scroll(function() {
       var scrollDistance = $(this).scrollTop()!;
       if (scrollDistance > 100) {
         $('.scroll-to-top').fadeIn();
@@ -188,7 +186,7 @@ export default class App extends React.Component<AppProps, {}> {
     });
 
     // Scroll to top
-    $(document).on('click', 'a.scroll-to-top', function (e) {
+    $(document).on('click', 'a.scroll-to-top', function(e) {
       var anchor = $(this);
       var offset = $(anchor.attr('href')!).offset()!;
       $('html, body')
@@ -242,8 +240,8 @@ const NavLink = (props: { item: MenuItem }) => {
 // Moved `withRouter` to a separate line.
 @observer
 class _Navigation extends React.Component<
-AppProps & RouteComponentProps<any>,
-{}
+  AppProps & RouteComponentProps<any>,
+  {}
 > {
   render() {
     return (
@@ -263,7 +261,7 @@ AppProps & RouteComponentProps<any>,
           aria-expanded="false"
           aria-label="Toggle navigation"
         >
-          <span className="navbar-toggler-icon"></span>
+          <span className="navbar-toggler-icon" />
         </button>
 
         <div className="collapse navbar-collapse" id="navbarResponsive">
@@ -276,7 +274,7 @@ AppProps & RouteComponentProps<any>,
           <ul className="navbar-nav sidenav-toggler">
             <li className="nav-item">
               <a className="nav-link text-center" id="sidenavToggler">
-                <i className="fa fa-fw fa-angle-left"></i>
+                <i className="fa fa-fw fa-angle-left" />
               </a>
             </li>
           </ul>
@@ -290,13 +288,15 @@ AppProps & RouteComponentProps<any>,
             <li className="nav-item">
               {this.props.auth.user ? (
                 <a className="nav-link" onClick={_ => this.props.auth.logout()}>
-                  <i className="fa fa-fw fa-sign-out-alt"></i>Sign Out
+                  <i className="fa fa-fw fa-sign-out-alt" />
+                  Sign Out
                 </a>
               ) : (
-                  <a className="nav-link" onClick={_ => this.props.auth.login()}>
-                    <i className="fa fa-fw fa-sign-in-alt"></i>Sign In
-                  </a>
-                )}
+                <a className="nav-link" onClick={_ => this.props.auth.login()}>
+                  <i className="fa fa-fw fa-sign-in-alt" />
+                  Sign In
+                </a>
+              )}
             </li>
           </ul>
         </div>
@@ -317,26 +317,26 @@ function useQuery() {
 }
 
 // The white list of hostname that enable GA.
-const HOSTNAME_WHITE_LIST = ['testnet-explorer.casperlabs.io', 'clarity.casperlabs.io'];
+const HOSTNAME_WHITE_LIST = [
+  'testnet-explorer.casperlabs.io',
+  'clarity.casperlabs.io'
+];
 
 const ENABLE_GA = HOSTNAME_WHITE_LIST.includes(window.location.hostname);
 
 if (ENABLE_GA) {
-  ReactGA.initialize("UA-133833104-1");
+  ReactGA.initialize('UA-133833104-1');
 }
 
 // the hook to send pageView to GA.
 function usePageViews() {
   let location = useLocation();
 
-  useEffect(
-    () => {
-      if (ENABLE_GA) {
-        ReactGA.pageview(location.pathname);
-      }
-    },
-    [location]
-  );
+  useEffect(() => {
+    if (ENABLE_GA) {
+      ReactGA.pageview(location.pathname);
+    }
+  }, [location]);
 }
 
 // Render the appropriate page.
@@ -396,9 +396,12 @@ const Content = (props: AppProps) => {
               <Title title="Vesting Contract" />
               <Vesting {...props} />
             </Route>
-            <Route path={Pages.DeployContracts} render={_ => <DeployContractsForm {...props} />} />
+            <Route
+              path={Pages.DeployContracts}
+              render={_ => <DeployContractsForm {...props} />}
+            />
             <Route path={Pages.Deploys}>
-              <Title title={"Deploys"} />
+              <Title title={'Deploys'} />
               <AccountSelector {...props} />
             </Route>
             <Route path={Pages.Search}>
@@ -406,8 +409,8 @@ const Content = (props: AppProps) => {
               <Search {...props} />
             </Route>
             <Route path={Pages.Validators}>
-              <Title title="Validators"/>
-              <Validators validatorsContainer={props.validatorsContainer}/>
+              <Title title="Validators" />
+              <Validators validatorsContainer={props.validatorsContainer} />
             </Route>
             <Route path={Pages.ConnectedPeers}>
               <Title title="Connected Peers" />
@@ -466,7 +469,7 @@ const Footer = () => (
       </div>
     </footer>
     <a className="scroll-to-top rounded" href="#page-top">
-      <i className="fa fa-angle-up"></i>
+      <i className="fa fa-angle-up" />
     </a>
   </section>
 );

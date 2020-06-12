@@ -37,7 +37,8 @@ export class FaucetContainer {
   }
 
   /** List faucet requests we sent earlier. */
-  @computed get faucetRequests() {
+  @computed
+  get faucetRequests() {
     return this._faucetRequests.get;
   }
 

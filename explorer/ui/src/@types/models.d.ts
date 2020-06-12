@@ -5,7 +5,7 @@ interface UserAccount {
   publicKeyBase64: string;
 }
 
-interface NamedHash{
+interface NamedHash {
   // Human readable name.
   name: string;
   // Hash of the vesting contract
@@ -17,8 +17,8 @@ interface UserMetadata {
   contracts?: Contracts;
 }
 
-interface Contracts{
-  vestingContracts?: NamedHash[]
+interface Contracts {
+  vestingContracts?: NamedHash[];
 }
 
 interface User {

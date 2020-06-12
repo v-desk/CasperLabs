@@ -8,5 +8,5 @@ interface CasperLabsHelper {
 }
 
 interface Window {
-  casperlabsHelper?: CasperLabsHelper
+  casperlabsHelper?: CasperLabsHelper;
 }

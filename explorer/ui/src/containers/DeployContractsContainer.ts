@@ -1,13 +1,28 @@
 import { action, observable } from 'mobx';
 
 import ErrorContainer from './ErrorContainer';
-import { CasperService, decodeBase16, DeployUtil, encodeBase16, Signer } from 'casperlabs-sdk';
+import {
+  CasperService,
+  decodeBase16,
+  DeployUtil,
+  encodeBase16,
+  Signer
+} from 'casperlabs-sdk';
 import { FieldState, FormState } from 'formstate';
-import { numberGreaterThan, validateBase16, validateInt, valueRequired } from '../lib/FormsValidator';
+import {
+  numberGreaterThan,
+  validateBase16,
+  validateInt,
+  valueRequired
+} from '../lib/FormsValidator';
 import validator from 'validator';
 import $ from 'jquery';
 import { Deploy } from 'casperlabs-grpc/io/casperlabs/casper/consensus/consensus_pb';
-import { CLType, CLValueInstance, Key } from 'casperlabs-grpc/io/casperlabs/casper/consensus/state_pb';
+import {
+  CLType,
+  CLValueInstance,
+  Key
+} from 'casperlabs-grpc/io/casperlabs/casper/consensus/state_pb';
 import { decodeBase64 } from 'tweetnacl-ts';
 import JSBI from 'jsbi';
 
@@ -44,7 +59,6 @@ const numberLimitForSigned = (bit: number) => {
   };
 };
 
-
 const NumberLimit = {
   [CLType.Simple.U8]: numberLimitForUnsigned(8),
   [CLType.Simple.U32]: numberLimitForUnsigned(32),
@@ -57,76 +71,88 @@ const NumberLimit = {
 };
 
 export type DeployArgument = {
-  name: FieldState<string>,
-  type: FieldState<SupportedType>,
+  name: FieldState<string>;
+  type: FieldState<SupportedType>;
   // if type == ArgumentType.Key then the type of secondType is KeyType
   // and if type == ArgumentType.BIG_INT, then the type of secondType is BitWidth
   // otherwise second equals to null
-  secondType: FieldState<KeyType | BitWidth | null>,
-  URefAccessRight: FieldState<Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap]>, // null if type != ArgumentType.KEY
-  value: FieldState<string>
-}
+  secondType: FieldState<KeyType | BitWidth | null>;
+  URefAccessRight: FieldState<
+    Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap]
+  >; // null if type != ArgumentType.KEY
+  value: FieldState<string>;
+};
 
 export type FormDeployArgument = FormState<DeployArgument>;
 type FormDeployArguments = FormState<FormDeployArgument[]>;
 
 export type DeployConfiguration = {
-  contractType: FieldState<DeployUtil.ContractType | null>,
-  contractHash: FieldState<string>,
-  paymentAmount: FieldState<number>,
-  fromAddress: FieldState<string>
-}
+  contractType: FieldState<DeployUtil.ContractType | null>;
+  contractHash: FieldState<string>;
+  paymentAmount: FieldState<number>;
+  fromAddress: FieldState<string>;
+};
 
 export type FormDeployConfiguration = FormState<DeployConfiguration>;
 
 interface RawDeployArguments {
-  name: string,
-  type: SupportedType,
-  secondType: KeyType | BitWidth | null,
-  URefAccessRight: Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap],
-  value: string
+  name: string;
+  type: SupportedType;
+  secondType: KeyType | BitWidth | null;
+  URefAccessRight: Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap];
+  value: string;
 }
 
 interface UserInputPersistent {
   deployConfiguration: {
-    contractType: DeployUtil.ContractType | null,
-    paymentAmount: number,
-    fromAddress: string
-  },
-  deployArguments: RawDeployArguments[],
-  editingDeployArguments: RawDeployArguments[],
-  editing: boolean
+    contractType: DeployUtil.ContractType | null;
+    paymentAmount: number;
+    fromAddress: string;
+  };
+  deployArguments: RawDeployArguments[];
+  editingDeployArguments: RawDeployArguments[];
+  editing: boolean;
 }
 
 export class DeployContractsContainer {
-  @observable deployConfiguration: FormDeployConfiguration = new FormState<DeployConfiguration>({
-    contractType: new FieldState<DeployUtil.ContractType | null>(null).validators(valueRequired),
+  @observable deployConfiguration: FormDeployConfiguration = new FormState<
+    DeployConfiguration
+  >({
+    contractType: new FieldState<DeployUtil.ContractType | null>(
+      null
+    ).validators(valueRequired),
     contractHash: new FieldState('').disableAutoValidation(),
     paymentAmount: new FieldState<number>(10000000).validators(
       numberGreaterThan(0),
       validateInt
     ),
     fromAddress: new FieldState<string>('')
-  }).compose().validators(deployConfiguration => {
-    if (deployConfiguration.contractType.$ === DeployUtil.ContractType.Hash) {
-      let value = deployConfiguration.contractHash.value;
-      let v = validateBase16(value) || valueRequired(value);
-      if (v !== false) {
-        deployConfiguration.contractHash.setError(v);
+  })
+    .compose()
+    .validators(deployConfiguration => {
+      if (deployConfiguration.contractType.$ === DeployUtil.ContractType.Hash) {
+        let value = deployConfiguration.contractHash.value;
+        let v = validateBase16(value) || valueRequired(value);
+        if (v !== false) {
+          deployConfiguration.contractHash.setError(v);
+        }
+        return v;
+      } else {
+        // WASM
+        if (!this.selectedFile) {
+          const msg = 'Upload WASM file firstly';
+          alert(msg);
+          return msg;
+        }
       }
-      return v;
-    } else {
-      // WASM
-      if (!this.selectedFile) {
-        const msg = 'Upload WASM file firstly';
-        alert(msg);
-        return msg;
-      }
-    }
-    return false;
-  });
-  @observable deployArguments: FormDeployArguments = new FormState<FormDeployArgument[]>([]);
-  @observable editingDeployArguments: FormDeployArguments = new FormState<FormDeployArgument[]>([]);
+      return false;
+    });
+  @observable deployArguments: FormDeployArguments = new FormState<
+    FormDeployArgument[]
+  >([]);
+  @observable editingDeployArguments: FormDeployArguments = new FormState<
+    FormDeployArgument[]
+  >([]);
   @observable selectedFile: File | null = null;
   @observable editing: boolean = false;
   @observable signDeployModal: boolean = false;
@@ -149,7 +175,7 @@ export class DeployContractsContainer {
 
   @action.bound
   removeDeployArgument(deployArgument: FormDeployArgument) {
-    let i = this.deployArguments.$.findIndex((f) => f === deployArgument);
+    let i = this.deployArguments.$.findIndex(f => f === deployArgument);
     this.deployArguments.$.splice(i, 1);
     this.saveToSessionStore();
   }
@@ -164,16 +190,25 @@ export class DeployContractsContainer {
     name: string = '',
     type: SupportedType = CLType.Simple.BOOL,
     secondType: KeyType | BitWidth | null = null,
-    accessRight: Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap] = Key.URef.AccessRights.NONE,
+    accessRight: Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap] = Key
+      .URef.AccessRights.NONE,
     value: string = ''
   ) {
     return new FormState({
-      name: new FieldState<string>(name).disableAutoValidation().validators(valueRequired),
+      name: new FieldState<string>(name)
+        .disableAutoValidation()
+        .validators(valueRequired),
       type: new FieldState<SupportedType>(type),
       secondType: new FieldState<KeyType | BitWidth | null>(secondType),
-      URefAccessRight: new FieldState<Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap]>(accessRight),
-      value: new FieldState<string>(value).disableAutoValidation().validators(valueRequired)
-    }).compose().validators(this.validateDeployArgument);
+      URefAccessRight: new FieldState<
+        Key.URef.AccessRightsMap[keyof Key.URef.AccessRightsMap]
+      >(accessRight),
+      value: new FieldState<string>(value)
+        .disableAutoValidation()
+        .validators(valueRequired)
+    })
+      .compose()
+      .validators(this.validateDeployArgument);
   }
 
   @action.bound
@@ -204,7 +239,10 @@ export class DeployContractsContainer {
 
   @action.bound
   cancelEditing() {
-    this.editingDeployArguments.$.splice(0, this.editingDeployArguments.$.length);
+    this.editingDeployArguments.$.splice(
+      0,
+      this.editingDeployArguments.$.length
+    );
     this.editing = false;
     this.saveToSessionStore();
   }
@@ -219,7 +257,6 @@ export class DeployContractsContainer {
       this.deployArguments.reset();
     }
   }
-
 
   @action.bound
   async openSignModal() {
@@ -243,7 +280,9 @@ export class DeployContractsContainer {
   async _onSubmit() {
     this.deployedHash = null;
     if (!Signer.isConnected()) {
-      throw new Error('Please install the CasperLabs Sign Helper Plugin first!');
+      throw new Error(
+        'Please install the CasperLabs Sign Helper Plugin first!'
+      );
     }
 
     const publicKeyBase64 = await Signer.getSelectedPublicKeyBase64();
@@ -261,7 +300,11 @@ export class DeployContractsContainer {
     try {
       sigBase64 = await Signer.sign(encodeBase16(deploy!.getDeployHash_asU8()));
       this.signing = false;
-      let signedDeploy = DeployUtil.setSignature(deploy, decodeBase64(sigBase64), publicKey);
+      let signedDeploy = DeployUtil.setSignature(
+        deploy,
+        decodeBase64(sigBase64),
+        publicKey
+      );
       await this.casperService.deploy(signedDeploy);
       ($(`#${this.accordionId}`) as any).collapse('hide');
       this.deployedHash = encodeBase16(signedDeploy.getDeployHash_asU8());
@@ -294,7 +337,14 @@ export class DeployContractsContainer {
       });
       const paymentAmount = config.paymentAmount.value;
 
-      return DeployUtil.makeDeploy(argsProto, type, session, null, JSBI.BigInt(paymentAmount), publicKey);
+      return DeployUtil.makeDeploy(
+        argsProto,
+        type,
+        session,
+        null,
+        JSBI.BigInt(paymentAmount),
+        publicKey
+      );
     }
   }
 
@@ -335,7 +385,11 @@ export class DeployContractsContainer {
     return clValueInstance;
   }
 
-  private buildSimpleTypeArg(simpleType: CLType.SimpleMap[keyof CLType.SimpleMap], argValueStr: string, arg: FormState<DeployArgument>): CLValueInstance {
+  private buildSimpleTypeArg(
+    simpleType: CLType.SimpleMap[keyof CLType.SimpleMap],
+    argValueStr: string,
+    arg: FormState<DeployArgument>
+  ): CLValueInstance {
     const value = new CLValueInstance.Value();
     const clType = new CLType();
     switch (simpleType) {
@@ -424,7 +478,9 @@ export class DeployContractsContainer {
    * If a truthy string is returned it represents a validation error.
    * @param deployArgument
    */
-  private validateDeployArgument(deployArgument: DeployArgument): string | false {
+  private validateDeployArgument(
+    deployArgument: DeployArgument
+  ): string | false {
     const value = deployArgument.value.$;
     switch (deployArgument.type.$) {
       case CLType.Simple.U8:
@@ -435,13 +491,17 @@ export class DeployContractsContainer {
       case CLType.Simple.U128:
       case CLType.Simple.U256:
       case CLType.Simple.U512:
-        let limit: { min: JSBI, max: JSBI } = (NumberLimit as any)[deployArgument.type.value];
+        let limit: { min: JSBI; max: JSBI } = (NumberLimit as any)[
+          deployArgument.type.value
+        ];
         if (!validator.isNumeric(value)) {
           return `Value should be a number`;
         }
         const v = JSBI.BigInt(value);
         if (v < limit.min || v > limit.max) {
-          return `Value should be in [${limit.min.toString(10)}, ${limit.max.toString(10)}]`;
+          return `Value should be in [${limit.min.toString(
+            10
+          )}, ${limit.max.toString(10)}]`;
         }
         return false;
       case CLType.Simple.STRING:
@@ -468,26 +528,46 @@ export class DeployContractsContainer {
 
   @action
   private tryRestore() {
-    const preState = localStorage.getItem(DeployContractsContainer.PersistentKey);
+    const preState = localStorage.getItem(
+      DeployContractsContainer.PersistentKey
+    );
     if (preState !== null) {
       const value = JSON.parse(preState) as UserInputPersistent;
 
       this.editing = value.editing;
 
-      this.deployConfiguration.$.paymentAmount.onChange(value.deployConfiguration.paymentAmount);
-      this.deployConfiguration.$.contractType.onChange(value.deployConfiguration.contractType);
-      this.deployConfiguration.$.fromAddress.onChange(value.deployConfiguration.fromAddress);
+      this.deployConfiguration.$.paymentAmount.onChange(
+        value.deployConfiguration.paymentAmount
+      );
+      this.deployConfiguration.$.contractType.onChange(
+        value.deployConfiguration.contractType
+      );
+      this.deployConfiguration.$.fromAddress.onChange(
+        value.deployConfiguration.fromAddress
+      );
 
       this.editingDeployArguments.reset();
       this.deployArguments.reset();
 
       value.editingDeployArguments?.forEach(arg => {
-        const deployArgument = this.newDeployArgument(arg.name, arg.type, arg.secondType, arg.URefAccessRight, arg.value);
+        const deployArgument = this.newDeployArgument(
+          arg.name,
+          arg.type,
+          arg.secondType,
+          arg.URefAccessRight,
+          arg.value
+        );
         this.editingDeployArguments.$.push(deployArgument);
       });
 
       value.deployArguments?.forEach(arg => {
-        const deployArgument = this.newDeployArgument(arg.name, arg.type, arg.secondType, arg.URefAccessRight, arg.value);
+        const deployArgument = this.newDeployArgument(
+          arg.name,
+          arg.type,
+          arg.secondType,
+          arg.URefAccessRight,
+          arg.value
+        );
         this.deployArguments.$.push(deployArgument);
       });
     }
@@ -524,6 +604,9 @@ export class DeployContractsContainer {
       })
     };
 
-    localStorage.setItem(DeployContractsContainer.PersistentKey, JSON.stringify(state));
+    localStorage.setItem(
+      DeployContractsContainer.PersistentKey,
+      JSON.stringify(state)
+    );
   }
 }

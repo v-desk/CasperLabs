@@ -31,27 +31,35 @@ class Validators extends RefreshableComponent<Props, {}> {
 
   render() {
     return (
-      <DataTable title="Validators" headers={['Validator ID', 'Latest Block Hash', 'JRank', 'Timestamp']}
-                 rows={this.props.validatorsContainer.validatorInfos}
-                 subscribeToggleStore={this.props.validatorsContainer.toggleableSubscriber.subscribeToggleStore}
-                 refresh={() => this.refresh()}
-                 renderRow={(validatorInfo: ValidatorInfo, idx) => {
-                   const blockHashBase16 = encodeBase16(validatorInfo.latestBlockHash);
-                   return (
-                     <tr key={validatorInfo.id}>
-                       <td>{base64to16(validatorInfo.id)}</td>
-                       <td>
-                         <Link to={Pages.block(blockHashBase16)}>{shortHash(blockHashBase16)}</Link>
-                       </td>
-                       <td>{validatorInfo.rank}</td>
-                       <td>
-                         <Timestamp timestamp={validatorInfo.timestamp}/>
-                       </td>
-                     </tr>
-                   );
-                 }}/>
+      <DataTable
+        title="Validators"
+        headers={['Validator ID', 'Latest Block Hash', 'JRank', 'Timestamp']}
+        rows={this.props.validatorsContainer.validatorInfos}
+        subscribeToggleStore={
+          this.props.validatorsContainer.toggleableSubscriber
+            .subscribeToggleStore
+        }
+        refresh={() => this.refresh()}
+        renderRow={(validatorInfo: ValidatorInfo, idx) => {
+          const blockHashBase16 = encodeBase16(validatorInfo.latestBlockHash);
+          return (
+            <tr key={validatorInfo.id}>
+              <td>{base64to16(validatorInfo.id)}</td>
+              <td>
+                <Link to={Pages.block(blockHashBase16)}>
+                  {shortHash(blockHashBase16)}
+                </Link>
+              </td>
+              <td>{validatorInfo.rank}</td>
+              <td>
+                <Timestamp timestamp={validatorInfo.timestamp} />
+              </td>
+            </tr>
+          );
+        }}
+      />
     );
   }
-};
+}
 
 export default Validators;

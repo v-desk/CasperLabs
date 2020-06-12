@@ -18,7 +18,8 @@ export default class StorageCell<T> {
     sessionStorage.setItem(this.key, JSON.stringify(this.value));
   }
 
-  @computed get get() {
+  @computed
+  get get() {
     return this.value;
   }
 
