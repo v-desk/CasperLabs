@@ -955,20 +955,43 @@ class EraRuntimeSpec extends WordSpec with Matchers with Inspectors with TickUti
           }
 
           "randomize the omega delay" in {
-            val ticks: List[Long] = List
-              .fill(10) {
-                runtime.handleAgenda(Agenda.StartRound(roundId)).value.collect {
-                  case Agenda.DelayedAction(tick, _: Agenda.CreateOmegaMessage) =>
-                    tick
-                }
+            implicit val clock = TestClock.adjustable[Id](now)
+
+            val runtime = genesisEraRuntime(
+              "Alice".some,
+              leaderSequencer = mockSequencer("Alice"),
+              roundExponent = exponent
+            )
+
+            val omegaDelays: List[Long] = List
+              .range(0L, 10L)
+              .map { i =>
+                val instant = conf.genesisEraStart plus (roundLength * i)
+                val roundId = conf.toTicks(instant)
+
+                // Omega is based on time, not just the round.
+                clock.set(conf.toInstant(roundId))
+
+                val omegaTick =
+                  runtime
+                    .handleAgenda(Agenda.StartRound(roundId))
+                    .value
+                    .collectFirst {
+                      case Agenda.DelayedAction(tick, _: Agenda.CreateOmegaMessage) =>
+                        tick
+                    }
+                    .get
+
+                omegaTick - roundId
               }
-              .flatten
 
-            ticks.toSet.size should be > 1
+            omegaDelays.toSet.size should be > 1
 
-            forAll(ticks) { tick =>
-              tick should be >= (roundId + (nextRoundId - roundId) * conf.omegaMessageTimeStart).toLong
-              tick should be < (roundId + (nextRoundId - roundId) * conf.omegaMessageTimeEnd).toLong
+            val ticksPerRound = Ticks.roundLength(exponent)
+
+            forAll(omegaDelays) { ticks =>
+              ticks shouldBe >=((ticksPerRound * conf.omegaMessageTimeStart).toLong)
+              ticks shouldBe <=((ticksPerRound * conf.omegaMessageTimeEnd).toLong)
             }
           }
         }
@@ -1428,6 +1451,27 @@ class EraRuntimeSpec extends WordSpec with Matchers with Inspectors with TickUti
       EraRuntime.isSameRoundAs(a)(d) shouldBe false
     }
   }
+
+  "omegaOffset" should {
+    "go from 0.0 to 1.0" in {
+      val expected = List(
+        "Alice"   -> 0.0,
+        "Bob"     -> 0.33,
+        "Charlie" -> 0.66,
+        "Dave"    -> 1.0
+      )
+      val names = expected.unzip._1
+
+      Inspectors.forAll(expected) {
+        case (name, offset) =>
+          EraRuntime.omegaOffset(names, name) shouldBe offset +- 0.01
+      }
+    }
+
+    "return 0.5 for single item" in {
+      EraRuntime.omegaOffset(List("Alice"), "Alice") shouldBe 0.5
+    }
+  }
 }
 
 object EraRuntimeSpec {
@@ -1456,8 +1500,12 @@ object EraRuntimeSpec {
     messages.map(m => m.validatorId -> m.messageHash).toMap
 
   def mockSequencer(validator: String) = new LeaderSequencer {
-    def apply[F[_]: MonadThrowable](era: Era): F[LeaderFunction] =
+    def leaderFunction[F[_]: MonadThrowable](era: Era): F[LeaderFunction] =
       ((_: Ticks) => validatorKey(validator)).pure[F]
+
+    def omegaFunction[F[_]: MonadThrowable](era: Era): F[OmegaFunction] =
+      // It was completely random before, so we can use the real randomizer.
+      LeaderSequencer.omegaFunction[F](era)
   }
 
   def insert[F[_]: Monad, A <: Message](
