@@ -68,7 +68,7 @@ impl<C: Context> ActiveValidator<C> {
     ) -> (Self, Vec<Effect<C>>) {
         let mut av = ActiveValidator {
             vidx,
-            secret: secret,
+            secret,
             round_exp,
             next_timer: 0,
         };
