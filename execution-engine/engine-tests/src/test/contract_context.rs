@@ -5,9 +5,9 @@ use engine_test_support::{
         DeployItemBuilder, ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_PAYMENT,
         DEFAULT_RUN_GENESIS_REQUEST,
     },
-    DEFAULT_ACCOUNT_ADDR,
+    Code, SessionBuilder, TestContextBuilder, Hash, DEFAULT_ACCOUNT_ADDR,
 };
-use types::{contracts::CONTRACT_INITIAL_VERSION, runtime_args, Key, RuntimeArgs};
+use types::{contracts::CONTRACT_INITIAL_VERSION, runtime_args, Key, RuntimeArgs, account::PublicKey, U512};
 
 const CONTRACT_HEADERS: &str = "contract_context.wasm";
 const PACKAGE_HASH_KEY: &str = "package_hash_key";
@@ -186,4 +186,54 @@ fn should_not_call_session_from_contract() {
     let exec_response = response.last().expect("should have response");
     let error = exec_response.as_error().expect("should have error");
     assert_matches!(error, Error::Exec(execution::Error::InvalidContext));
+}
+
+#[ignore]
+#[test]
+fn should_keep_context() {
+    const CONTRACT: &str = "contract";
+    const CONTRACT_HASH: &str = "contract_hash";
+    const COUNTER: &str = "counter";
+    const INCREMENT: &str = "increment";
+    const WASM: &str = "contract_context_2.wasm";
+
+    // Prepare the context.
+    let mut context = TestContextBuilder::new()
+            .with_account(DEFAULT_ACCOUNT_ADDR, U512::from(128_000_000))
+            .build();
+
+    // Deploy the contract_context_2.wasm.
+    let session_code = Code::from(WASM);
+    let session_args = runtime_args! {};
+    let session = SessionBuilder::new(session_code, session_args)
+        .with_address(DEFAULT_ACCOUNT_ADDR)
+        .with_authorization_keys(&[DEFAULT_ACCOUNT_ADDR])
+        .build();
+    context.run(session);
+
+    // Read the contract hash.
+    let contract_hash: Hash = context
+        .query(DEFAULT_ACCOUNT_ADDR, &[CONTRACT_HASH])
+        .unwrap_or_else(|_| panic!("{} contract not found", CONTRACT_HASH))
+        .into_t()
+        .unwrap_or_else(|_| panic!("{} has wrong type", CONTRACT_HASH));
+
+    // Assert the counter value.
+    // The previous deploy should have created a new contract with counter initialized to 10,
+    // and then should have call "increment", so the value should be 11. 
+    let counter: u64 = context.query(DEFAULT_ACCOUNT_ADDR, &[CONTRACT, COUNTER]).unwrap().into_t().unwrap();
+    assert_eq!(counter, 11);
+
+    // Call the increment method.
+    let session_code = Code::Hash(contract_hash, INCREMENT.to_string());
+    let session_args = runtime_args! {};
+    let session = SessionBuilder::new(session_code, session_args)
+        .with_address(DEFAULT_ACCOUNT_ADDR)
+        .with_authorization_keys(&[DEFAULT_ACCOUNT_ADDR])
+        .build();
+    context.run(session);
+
+    // The counter value should be 12 now.
+    let counter: u64 = context.query(DEFAULT_ACCOUNT_ADDR, &[CONTRACT, COUNTER]).unwrap().into_t().unwrap();
+    assert_eq!(counter, 12);    
 }
