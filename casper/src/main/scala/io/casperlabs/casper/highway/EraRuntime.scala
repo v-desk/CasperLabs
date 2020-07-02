@@ -788,12 +788,13 @@ object EraRuntime {
       leaderSequencer: LeaderSequencer = LeaderSequencer
   ): F[EraRuntime[F]] =
     for {
-      leaderFunction   <- leaderSequencer.leaderFunction[F](era)
-      omegaFunction    <- leaderSequencer.omegaFunction[F](era)
-      roundExponentRef <- Ref.of[F, Int](initRoundExponent)
-      dag              <- DagStorage[F].getRepresentation
-      semaphoreMap     <- SemaphoreMap[F, PublicKeyHashBS](1)
-      isOrphanEra      <- isOrphanEra[F](era.keyBlockHash)
+      leaderFunction      <- leaderSequencer.leaderFunction[F](era)
+      omegaFunction       <- leaderSequencer.omegaFunction[F](era)
+      roundExponentRef    <- Ref.of[F, Int](initRoundExponent)
+      dag                 <- DagStorage[F].getRepresentation
+      semaphoreMap        <- SemaphoreMap[F, PublicKeyHashBS](1)
+      isOrphanEra         <- isOrphanEra[F](era.keyBlockHash)
+      isKeyBlockFinalized <- FinalityStorageReader[F].isFinalized(era.keyBlockHash)
     } yield {
       new EraRuntime[F](
         conf,
@@ -804,7 +805,9 @@ object EraRuntime {
         // Whether the validator is bonded depends on the booking block. Only bonded validators
         // have to produce blocks and ballots in the era.
         maybeMessageProducer.filter { mp =>
-          !isOrphanEra && era.bonds.exists(b => b.validatorPublicKeyHash == mp.validatorId)
+          !isOrphanEra &&
+          isKeyBlockFinalized &&
+          era.bonds.exists(b => b.validatorPublicKeyHash == mp.validatorId)
         },
         semaphoreMap,
         isSynced,

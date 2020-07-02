@@ -219,6 +219,7 @@ trait HighwayFixture
                      } else {
                        db.lookupUnsafe(keyBlockHash)
                      }
+
           childEra = randomEra
             .withKeyBlockHash(keyBlock.messageHash)
             .withParentKeyBlockHash(era.keyBlockHash)
