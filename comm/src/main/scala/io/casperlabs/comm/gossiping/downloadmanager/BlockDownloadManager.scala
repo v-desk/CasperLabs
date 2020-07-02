@@ -19,6 +19,7 @@ import io.casperlabs.shared.Log
 import monix.execution.Scheduler
 import monix.tail.Iterant
 import scala.util.Try
+import scala.concurrent.duration.FiniteDuration
 
 /** Manages the download, validation, storing and gossiping of blocks. */
 trait BlockDownloadManager[F[_]] extends DownloadManager[F] {
@@ -43,6 +44,7 @@ object BlockDownloadManagerImpl extends DownloadManagerCompanion {
   def apply[F[_]: ContextShift: Concurrent: Log: Timer: Metrics](
       maxParallelDownloads: Int,
       partialBlocksEnabled: Boolean,
+      cacheExpiry: FiniteDuration,
       connectToGossip: GossipService.Connector[F],
       backend: Backend[F],
       relaying: BlockRelaying[F],
@@ -51,16 +53,18 @@ object BlockDownloadManagerImpl extends DownloadManagerCompanion {
   ): Resource[F, BlockDownloadManager[F]] =
     Resource.make {
       for {
-        isShutdown <- Ref.of(false)
-        itemsRef   <- Ref.of(Map.empty[ByteString, Item[F]])
-        workersRef <- Ref.of(Map.empty[ByteString, Fiber[F, Unit]])
-        semaphore  <- Semaphore[F](maxParallelDownloads.toLong)
-        signal     <- MVar[F].empty[Signal[F]]
+        isShutdown  <- Ref.of(false)
+        itemsRef    <- Ref.of(Map.empty[ByteString, Item[F]])
+        workersRef  <- Ref.of(Map.empty[ByteString, Fiber[F, Unit]])
+        semaphore   <- Semaphore[F](maxParallelDownloads.toLong)
+        signal      <- MVar[F].empty[Signal[F]]
+        recentCache <- DownloadedCache[F, ByteString](cacheExpiry)
         manager = new BlockDownloadManagerImpl[F](
           this,
           isShutdown,
           itemsRef,
           workersRef,
+          recentCache,
           semaphore,
           signal,
           connectToGossip,
@@ -86,7 +90,7 @@ object BlockDownloadManagerImpl extends DownloadManagerCompanion {
     }
 
   override def dependencies(summary: BlockSummary) =
-    summary.parentHashes ++ summary.justifications.map(_.latestBlockHash)
+    (summary.parentHashes ++ summary.justifications.map(_.latestBlockHash)).distinct
 }
 
 class BlockDownloadManagerImpl[F[_]](
@@ -96,6 +100,8 @@ class BlockDownloadManagerImpl[F[_]](
     val itemsRef: Ref[F, Map[ByteString, BlockDownloadManagerImpl.Item[F]]],
     // Keep track of ongoing downloads so we can cancel them.
     val workersRef: Ref[F, Map[ByteString, Fiber[F, Unit]]],
+    // Keep a cache of recently downloaded items.
+    val recentlyDownloaded: BlockDownloadManagerImpl.DownloadedCache[F, ByteString],
     // Limit parallel downloads.
     val semaphore: Semaphore[F],
     // Single item control signals for the manager loop.

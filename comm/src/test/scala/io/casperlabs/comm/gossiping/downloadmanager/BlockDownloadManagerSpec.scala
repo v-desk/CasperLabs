@@ -318,6 +318,7 @@ class BlockDownloadManagerSpec
           alloc <- BlockDownloadManagerImpl[Task](
                     maxParallelDownloads = 1,
                     partialBlocksEnabled = true,
+                    cacheExpiry = 1.hour,
                     connectToGossip = _ => remote,
                     backend = backend,
                     relaying = MockRelaying.default,
@@ -348,6 +349,7 @@ class BlockDownloadManagerSpec
           alloc <- BlockDownloadManagerImpl[Task](
                     maxParallelDownloads = 1,
                     partialBlocksEnabled = true,
+                    cacheExpiry = 1.hour,
                     connectToGossip = _ => MockGossipService(),
                     backend = MockBackend(),
                     relaying = MockRelaying.default,
@@ -718,6 +720,7 @@ object BlockDownloadManagerSpec {
       val managerR = BlockDownloadManagerImpl[Task](
         maxParallelDownloads = maxParallelDownloads,
         partialBlocksEnabled = true,
+        cacheExpiry = 1.hour,
         connectToGossip = remote(_),
         backend = backend,
         relaying = relaying,
@@ -779,10 +782,11 @@ object BlockDownloadManagerSpec {
   class MockRelaying extends BlockRelaying[Task] {
     @volatile var relayed = Vector.empty[ByteString]
 
-    override def relay(hashes: List[ByteString]): Task[Task[Unit]] = Task.delay {
-      synchronized { relayed = relayed ++ hashes }
-      Task.unit
-    }
+    override def relay(hashes: List[ByteString], sources: Set[Node]): Task[Task[Unit]] =
+      Task.delay {
+        synchronized { relayed = relayed ++ hashes }
+        Task.unit
+      }
   }
   object MockRelaying {
     def default: MockRelaying = apply()

@@ -5,6 +5,7 @@ import cats.effect._
 import cats.effect.concurrent._
 import cats.implicits._
 import com.google.protobuf.ByteString
+import com.google.common.cache.{Cache, CacheBuilder}
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -24,9 +25,10 @@ import monix.tail.Iterant
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.Try
+import java.util.concurrent.TimeUnit
 
 trait DownloadManagerTypes {
 
@@ -202,6 +204,27 @@ trait DownloadManagerCompanion extends DownloadManagerTypes {
     loop(Set.empty, Queue(id)) - id
   }
 
+  case class DownloadedCache[F[_]: Sync, K](
+      cache: Cache[K, DownloadedCache.Marker.type]
+  ) {
+    def put(identifier: K): F[Unit] =
+      Sync[F].delay(cache.put(identifier, DownloadedCache.Marker))
+
+    def contains(identifier: K): F[Boolean] =
+      Sync[F].delay(Option(cache.getIfPresent(identifier)).isDefined)
+  }
+  object DownloadedCache {
+    object Marker
+    def apply[F[_]: Sync, K <: Object](expiry: FiniteDuration = 1.hour): F[DownloadedCache[F, K]] =
+      Sync[F].delay {
+        DownloadedCache(
+          CacheBuilder
+            .newBuilder()
+            .expireAfterWrite(expiry.toSeconds, TimeUnit.SECONDS)
+            .build[K, Marker.type]()
+        )
+      }
+  }
 }
 
 /** Manages the download, validation, storing and gossiping of [[DownloadManagerTypes#Downloadable]].*/
@@ -221,6 +244,9 @@ trait DownloadManager[F[_]] extends DownloadManagerTypes {
 
   /** Check if an item has already been scheduled for download. */
   def isScheduled(id: Identifier): F[Boolean]
+
+  /** Check if an item has been recently downloaded. */
+  def wasDownloaded(id: Identifier): F[Boolean]
 
   /** Add a new source to an existing schedule and all of its dependencies. */
   def addSource(id: Identifier, source: Node): F[WaitHandle[F]]
@@ -250,6 +276,8 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
   val itemsRef: Ref[F, Map[Identifier, companion.Item[F]]]
   // Keep track of ongoing downloads so we can cancel them.
   val workersRef: Ref[F, Map[Identifier, Fiber[F, Unit]]]
+  // Keep track of recently downloaded items.
+  val recentlyDownloaded: DownloadedCache[F, Identifier]
   // Limit parallel downloads.
   val semaphore: Semaphore[F]
   // Single item control signals for the manager loop.
@@ -375,13 +403,13 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
             } yield downloadFeedback
           )
         // Report any startup errors so the caller knows something's fatally wrong, then carry on.
-        start
-          .attemptAndLog("An error occurred when handling Download signal.")
-          .flatMap(scheduleFeedback.complete) >> run
+        start.attempt.flatMap(scheduleFeedback.complete) >> run
 
       case Signal.DownloadSuccess(id) =>
         val finish = for {
           _ <- workersRef.update(_ - id)
+          // Remember that we downloaded this item without having to hit the backend for a while.
+          _ <- recentlyDownloaded.put(id)
           // Remove the item and check what else we can download now.
           next <- itemsRef.modify { items =>
                    val item = items(id)
@@ -496,7 +524,10 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
     itemsRef.get.map(_ contains id)
 
   private def isDownloaded(id: Identifier): F[Boolean] =
-    backend.contains(id)
+    wasDownloaded(id).ifM(true.pure[F], backend.contains(id))
+
+  override def wasDownloaded(id: Identifier): F[Boolean] =
+    recentlyDownloaded.contains(id)
 
   /** Kick off the download and mark the item. */
   private def startWorker(item: Item[F]): F[Unit] =
@@ -526,12 +557,12 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
         }
         .timerGauge("fetches") // Measure with wait time.
 
-    def tryDownload(handle: Handle, source: Node, relay: Boolean) =
+    def tryDownload(handle: Handle, source: Node, relay: Boolean, knownSources: Set[Node]) =
       for {
         downloadable <- throttledFetchAndRestore(source, handle)
         _            <- backend.validate(downloadable)
         _            <- backend.store(downloadable)
-        _            <- relaying.relay(List(handle.id.toByteString)).whenA(relay)
+        _            <- relaying.relay(List(handle.id.toByteString), knownSources).whenA(relay)
         _            <- success
         _            <- Metrics[F].incrementCounter("downloads_succeeded")
       } yield ()
@@ -578,15 +609,16 @@ trait DownloadManagerImpl[F[_]] extends DownloadManager[F] { self =>
                     s"Scheduling download of ${kind} ${id.show -> "id"} from ${source.show -> "peer"} later, $attempt, $delay"
                   ) *>
                     Timer[F].sleep(delay) *>
-                    tryDownload(item.handle, source, item.relay).handleErrorWith {
-                      case NonFatal(ex) =>
-                        val nextAttempt = attempt + 1
-                        Metrics[F].incrementCounter("downloads_failed") *>
-                          Log[F].warn(
-                            s"Retrying download of ${kind} ${id.show -> "id"} from other sources, failed source: ${source.show -> "peer"}, prev $attempt: $ex"
-                          ) >>
-                          loop(counterPerSource.updated(source, nextAttempt), ex.some)
-                    }
+                    tryDownload(item.handle, source, item.relay, potentiallyNewSources)
+                      .recoverWith {
+                        case NonFatal(ex) =>
+                          val nextAttempt = attempt + 1
+                          Metrics[F].incrementCounter("downloads_failed") *>
+                            Log[F].warn(
+                              s"Retrying download of ${kind} ${id.show -> "id"} from other sources, failed source: ${source.show -> "peer"}, prev $attempt: $ex"
+                            ) >>
+                            loop(counterPerSource.updated(source, nextAttempt), ex.some)
+                      }
                 case _: Duration.Infinite => sys.error("Unreachable")
               }
           }

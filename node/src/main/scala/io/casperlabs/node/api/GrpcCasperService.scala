@@ -37,7 +37,7 @@ import monix.reactive.Observable
 object GrpcCasperService {
 
   def apply[F[_]: Concurrent: TaskLike: Log: Metrics: FinalityStorage: BlockStorage: ExecutionEngineService: DeployStorage: Fs2Compiler: DeployBuffer: DeployRelaying: DagStorage: EventStream](
-      isReadOnlyNode: Boolean
+      isDeployEnabled: Boolean
   ): F[CasperGrpcMonix.CasperService] =
     BlockAPI.establishMetrics[F] *> Sync[F].delay {
       val adaptToInvalidArgument: PartialFunction[Throwable, Throwable] = {
@@ -47,11 +47,11 @@ object GrpcCasperService {
       new CasperGrpcMonix.CasperService {
         override def deploy(request: DeployRequest): Task[Empty] =
           TaskLike[F].apply {
-            if (isReadOnlyNode)
+            if (!isDeployEnabled)
               MonadThrowable[F].raiseError(
-                FailedPrecondition("Node is in read-only mode.")
+                FailedPrecondition("The node doesn't accept deploys.")
               )
-            else BlockAPI.deploy[F](request.getDeploy).map(_ => Empty())
+            else BlockAPI.deploy[F](request.getDeploy).as(Empty())
           }
 
         override def getBlockInfo(request: GetBlockInfoRequest): Task[BlockInfo] =
@@ -154,7 +154,7 @@ object GrpcCasperService {
                   err => SmartContractEngineError(s"Error with EE response $storedValue:\n$err")
                 )
             }
-            value <- Concurrent[F].fromEither(protoValue).handleErrorWith {
+            value <- Concurrent[F].fromEither(protoValue).recoverWith {
                       case SmartContractEngineError(msg) =>
                         MonadThrowable[F].raiseError(InvalidArgument(msg))
                     }
@@ -227,7 +227,7 @@ object GrpcCasperService {
       keyType: StateQuery.KeyVariant,
       keyValue: String
   ): F[state.Key] =
-    Utils.toKey[F](keyType.name, keyValue).handleErrorWith {
+    Utils.toKey[F](keyType.name, keyValue).recoverWith {
       case ex: java.lang.IllegalArgumentException =>
         MonadThrowable[F].raiseError(InvalidArgument(ex.getMessage))
     }
