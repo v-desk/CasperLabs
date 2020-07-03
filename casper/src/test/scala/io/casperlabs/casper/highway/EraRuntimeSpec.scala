@@ -295,6 +295,9 @@ class EraRuntimeSpec extends WordSpec with Matchers with Inspectors with TickUti
       case HighwayEvent.CreatedLambdaMessage(msg: Message.Block) => msg
     }.get
 
+    // Make sure the child era key block is finalized so the validator joins.
+    FS.markAsFinalized(childEra.keyBlockHash, Set.empty, Set.empty)
+
     val childRuntime =
       childEraRuntime(childEra, validator.some, leaderSequencer = mockSequencer(leader))
 
