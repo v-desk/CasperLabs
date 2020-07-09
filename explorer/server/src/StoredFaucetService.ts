@@ -21,6 +21,8 @@ export class StoredFaucetService {
   // if finalized, we no longer need set dependencies when calling stored version contract
   private storedFaucetFinalized: boolean = false;
 
+  private faucetPublicKeyHash: ByteArray;
+
   constructor(
     private faucetContract: Contracts.BoundContract,
     private contractKeys: SignKeyPair,
@@ -29,10 +31,14 @@ export class StoredFaucetService {
     private deployService: DeployService,
     private casperService: CasperService
   ) {
+    this.faucetPublicKeyHash = Keys.Ed25519.publicKeyHash(this.contractKeys.publicKey);
     this.periodCheckState();
   }
 
+  // Give free tokens to `accountPublicKeyHash`.
   async callStoredFaucet(accountPublicKeyHash: ByteArray): Promise<DeployHash> {
+    // If the stored faucet contract isn't deployed yet, do it now and set it as a dependency for the transfer.
+    // The deployment will store the contract under the faucet account by name.
     if (!this.storedFaucetFinalized && !this.deployHash) {
       const state = await this.checkState();
       if (state) {
@@ -51,16 +57,19 @@ export class StoredFaucetService {
     if (this.deployHash) {
       dependencies.push(this.deployHash);
     }
+
+    // Call the stored faucet contract by name.
     const deployByName = DeployUtil.makeDeploy(
       CallFaucet.args(accountPublicKeyHash, this.transferAmount),
       DeployUtil.ContractType.Name,
       CONTRACT_NAME,
       null,
       this.paymentAmount,
-      Keys.Ed25519.publicKeyHash(this.contractKeys.publicKey),
+      this.faucetPublicKeyHash,
       dependencies,
       ENTRY_POINT_NAME
     );
+
     const signedDeploy = DeployUtil.signDeploy(deployByName, this.contractKeys);
     await this.deployService.deploy(signedDeploy);
     return signedDeploy.getDeployHash_asU8();
@@ -90,7 +99,7 @@ export class StoredFaucetService {
       const LFB = await this.casperService.getLastFinalizedBlockInfo();
       const blockHash = LFB.getSummary()!.getBlockHash_asU8();
       const stateQuery = new StateQuery();
-      stateQuery.setKeyBase16(encodeBase16(this.contractKeys.publicKey));
+      stateQuery.setKeyBase16(encodeBase16(this.faucetPublicKeyHash));
       stateQuery.setKeyVariant(StateQuery.KeyVariant.ADDRESS);
       stateQuery.setPathSegmentsList([CONTRACT_NAME]);
 
