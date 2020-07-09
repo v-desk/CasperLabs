@@ -95,6 +95,7 @@ class FinalityDetectorVotingMatrix[F[_]: Concurrent: Log: AncestorsStorage] priv
                         .buildString(latestFinalizedBlock)                   -> "latestFinalizedBlock"}"
                     )
                     .void
+                    .whenA(message.parentBlock != latestFinalizedBlock)
               }
         } yield ()
       )
