@@ -37,21 +37,7 @@ export class StoredFaucetService {
 
   // Give free tokens to `accountPublicKeyHash`.
   async callStoredFaucet(accountPublicKeyHash: ByteArray): Promise<DeployHash> {
-    // If the stored faucet contract isn't deployed yet, do it now and set it as a dependency for the transfer.
-    // The deployment will store the contract under the faucet account by name.
-    if (!this.storedFaucetFinalized && !this.deployHash) {
-      const state = await this.checkState();
-      if (state) {
-        this.storedFaucetFinalized = true;
-      } else {
-        const deploy = this.faucetContract.deploy(
-          StoredFaucet.args(),
-          this.paymentAmount
-        );
-        await this.deployService.deploy(deploy);
-        this.deployHash = deploy.getDeployHash_asU8();
-      }
-    }
+    await this.maybeDeployStoredFaucetContract();
 
     const dependencies = [];
     if (this.deployHash) {
@@ -76,16 +62,22 @@ export class StoredFaucetService {
   }
 
   /**
-   * Check whether stored version faucet has been finalised every 10 seconds.
+   * Check whether stored version faucet has been finalised every 10 seconds
+   * until it's finalized, at which point we no longer need to set the deployment
+   * as a dependency for future faucet transfers.
    */
   private async periodCheckState() {
     const timeInterval = setInterval(async () => {
       const state = await this.checkState();
       if (state) {
+        console.log("Stored faucet contract finalized.")
         this.storedFaucetFinalized = true;
         // we don't need to set dependency anymore
         this.deployHash = null;
         clearInterval(timeInterval);
+      } else {
+        console.log("Stored faucet contract not found in LFB.")
+        await this.maybeDeployStoredFaucetContract();
       }
     }, 10 * 1000);
   }
@@ -110,6 +102,30 @@ export class StoredFaucetService {
       return state;
     } catch {
       return null;
+    }
+  }
+
+  private async maybeDeployStoredFaucetContract() {
+    // If the stored faucet contract isn't deployed yet, do it now and set it as a dependency for the transfer.
+    // The deployment will store the contract under the faucet account by name.
+    if (!this.storedFaucetFinalized && !this.deployHash) {
+      const state = await this.checkState();
+      if (state) {
+        this.storedFaucetFinalized = true;
+      } else {
+        const deploy = this.faucetContract.deploy(
+          StoredFaucet.args(),
+          this.paymentAmount
+        );
+        try {
+          console.log("Deploying stored faucet...")
+          await this.deployService.deploy(deploy);
+          this.deployHash = deploy.getDeployHash_asU8();
+          console.log("Submitted stored faucet contract in deploy " + encodeBase16(this.deployHash));
+        } catch (ex) {
+          console.log("Failed to deploy stored faucet:", ex)
+        }
+      }
     }
   }
 }
