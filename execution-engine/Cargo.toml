@@ -4,6 +4,7 @@ members = [
     "cargo-casperlabs",
     "contract",
     "contracts/[!.]*/*",
+    "contract_macro",
     "engine-core",
     "engine-grpc-server",
     "engine-metrics-scraper",

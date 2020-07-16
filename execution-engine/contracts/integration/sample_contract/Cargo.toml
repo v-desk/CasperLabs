@@ -1,0 +1,21 @@
+[package]
+name = "contract"
+version = "0.1.0"
+authors = ["karandh <karan@casperlabs.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+casperlabs_contract = { path = "../../../contract", package = "casperlabs-contract" }
+casperlabs_types = { path = "../../../types", package = "casperlabs-types" }
+contract_macro = { path = "../../../contract_macro" }
+
+[lib]
+crate-type = ["cdylib"]
+bench = false
+doctest = false
+test = false
+
+[features]
+default = ["casperlabs_contract/std", "casperlabs_types/std", "casperlabs_contract/test-support"]

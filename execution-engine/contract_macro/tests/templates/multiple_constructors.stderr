@@ -1,0 +1,167 @@
+error[E0428]: the name `call` is defined multiple times
+  --> $DIR/multiple_constructors.rs:37:5
+   |
+30 |     #[casperlabs_constructor]
+   |     ------------------------- previous definition of the value `call` here
+...
+37 |     #[casperlabs_constructor]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ `call` redefined here
+   |
+   = note: `call` must be defined only once in the value namespace of this module
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `contract`
+  --> $DIR/multiple_constructors.rs:13:5
+   |
+13 | use contract::{
+   |     ^^^^^^^^ use of undeclared type or module `contract`
+
+error[E0433]: failed to resolve: use of undeclared type or module `types`
+  --> $DIR/multiple_constructors.rs:17:5
+   |
+17 | use types::{
+   |     ^^^^^ use of undeclared type or module `types`
+
+error[E0432]: unresolved import `types`
+  --> $DIR/multiple_constructors.rs:17:5
+   |
+17 | use types::{
+   |     ^^^^^ use of undeclared type or module `types`
+
+error: cannot determine resolution for the macro `runtime_args`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: import resolution is stuck, try simplifying macro imports
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `storage`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `storage`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `EntryPoints`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `EntryPoints`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `EntryPoint`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `EntryPoint`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `EntryPointAccess`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `EntryPointAccess`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `EntryPointType`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `EntryPointType`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `runtime`
+  --> $DIR/multiple_constructors.rs:27:1
+   |
+27 | #[casperlabs_contract]
+   | ^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `runtime`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `runtime`
+  --> $DIR/multiple_constructors.rs:30:5
+   |
+30 |     #[casperlabs_constructor]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `runtime`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared type or module `storage`
+  --> $DIR/multiple_constructors.rs:32:31
+   |
+32 |         let value_ref: URef = storage::new_uref(s);
+   |                               ^^^^^^^ use of undeclared type or module `storage`
+
+error[E0433]: failed to resolve: use of undeclared type or module `runtime`
+  --> $DIR/multiple_constructors.rs:34:9
+   |
+34 |         runtime::put_key(KEY, value_key);
+   |         ^^^^^^^ use of undeclared type or module `runtime`
+
+error[E0433]: failed to resolve: use of undeclared type or module `storage`
+  --> $DIR/multiple_constructors.rs:40:29
+   |
+40 |         let int_ref: URef = storage::new_uref(u);
+   |                             ^^^^^^^ use of undeclared type or module `storage`
+
+error[E0433]: failed to resolve: use of undeclared type or module `runtime`
+  --> $DIR/multiple_constructors.rs:42:9
+   |
+42 |         runtime::put_key(INT_KEY, int_key)
+   |         ^^^^^^^ use of undeclared type or module `runtime`
+
+error[E0433]: failed to resolve: use of undeclared type or module `storage`
+  --> $DIR/multiple_constructors.rs:47:29
+   |
+47 |         let int_ref: URef = storage::new_uref(c);
+   |                             ^^^^^^^ use of undeclared type or module `storage`
+
+error[E0433]: failed to resolve: use of undeclared type or module `runtime`
+  --> $DIR/multiple_constructors.rs:49:9
+   |
+49 |         runtime::put_key(U512_KEY, int_key)
+   |         ^^^^^^^ use of undeclared type or module `runtime`
+
+error[E0433]: failed to resolve: use of undeclared type or module `runtime`
+  --> $DIR/multiple_constructors.rs:45:5
+   |
+45 |     #[casperlabs_method]
+   |     ^^^^^^^^^^^^^^^^^^^^ use of undeclared type or module `runtime`
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: invalid `crate_type` value
+ --> $DIR/multiple_constructors.rs:4:18
+  |
+4 |     crate_type = "target arch should be wasm32"
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[deny(unknown_crate_types)]` on by default
+
+warning: unused import: `BTreeMap`
+ --> $DIR/multiple_constructors.rs:8:19
+  |
+8 |     collections::{BTreeMap, BTreeSet},
+  |                   ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+error[E0061]: this function takes 2 arguments but 0 arguments were supplied
+  --> $DIR/multiple_constructors.rs:37:5
+   |
+27 | #[casperlabs_contract]
+   | ---------------------- defined here
+...
+37 |     #[casperlabs_constructor]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^- supplied 0 arguments
+   |     |
+   |     expected 2 arguments
+   |
+   = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)
